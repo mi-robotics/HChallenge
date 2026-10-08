@@ -37,12 +37,18 @@ class D405:
         self.dist = np.array(intr.coeffs[:5])
         self.size = (intr.width, intr.height)
 
-    def read(self):
-        """Returns (bgr uint8 HxWx3, depth in metres float32 HxW aligned to colour, timestamp ms)."""
+    def read_raw(self):
+        """Returns (bgr uint8 HxWx3, raw depth uint16 HxW aligned to colour, timestamp ms, frame number).
+        Raw depth x depth_scale = metres."""
         frames = self.align.process(self.pipe.wait_for_frames())
         color = np.asanyarray(frames.get_color_frame().get_data()).copy()
-        depth = np.asanyarray(frames.get_depth_frame().get_data()).astype(np.float32) * self.depth_scale
-        return color, depth, frames.get_timestamp()
+        depth = np.asanyarray(frames.get_depth_frame().get_data()).copy()
+        return color, depth, frames.get_timestamp(), frames.get_color_frame().get_frame_number()
+
+    def read(self):
+        """Returns (bgr uint8 HxWx3, depth in metres float32 HxW aligned to colour, timestamp ms)."""
+        color, depth, t, _ = self.read_raw()
+        return color, depth.astype(np.float32) * self.depth_scale, t
 
     def close(self):
         self.pipe.stop()
