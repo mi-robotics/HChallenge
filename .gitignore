@@ -1,0 +1,11 @@
+__pycache__/
+*.pyc
+.ipynb_checkpoints/
+.DS_Store
+
+# Recorded data and large media stay out of git
+data/
+*.mp4
+*.mov
+*.hdf5
+*.npz

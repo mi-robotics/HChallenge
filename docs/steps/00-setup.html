@@ -1,0 +1,110 @@
+<title>Step 00 · Project Setup</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;700;800&family=Source+Serif+4:opsz,wght@8..60,400;8..60,600&family=JetBrains+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: single reading column, a fact strip under the title, sections with mono labels like a lab notebook */
+:root {
+  --bg: #f5f6f8; --surface: #ffffff; --fg: #1a1e26; --muted: #5d6573; --line: #dde1e8;
+  --accent: #2d4fd0; --ok: #1d7a4a; --warn: #a65b00; --code-bg: #eceff4;
+  --display: "Archivo", "Helvetica Neue", Arial, sans-serif;
+  --body: "Source Serif 4", Georgia, serif;
+  --mono: "JetBrains Mono", ui-monospace, Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #12151b; --surface: #1a1e26; --fg: #e6e9ef; --muted: #98a0ae; --line: #2c323d;
+  --accent: #8aa2ff; --ok: #5cc78e; --warn: #f0a646; --code-bg: #222731; color-scheme: dark } }
+:root[data-theme="dark"] {
+  --bg: #12151b; --surface: #1a1e26; --fg: #e6e9ef; --muted: #98a0ae; --line: #2c323d;
+  --accent: #8aa2ff; --ok: #5cc78e; --warn: #f0a646; --code-bg: #222731; color-scheme: dark }
+
+body { background: var(--bg); color: var(--fg); font: 17px/1.6 var(--body); padding-inline: 16px; padding-block: 40px 64px; }
+main { max-width: 44rem; margin: 0 auto; display: grid; gap: 36px; }
+header { display: grid; gap: 10px; }
+.eyebrow { font: 500 12px/1 var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+h1 { font: 800 clamp(30px, 6vw, 42px)/1.1 var(--display); letter-spacing: -.01em; margin: 0; text-wrap: balance; }
+h2 { font: 700 20px/1.3 var(--display); margin: 0 0 8px; text-wrap: balance; }
+p { margin: 0; }
+section { display: grid; gap: 12px; }
+.lede { color: var(--muted); max-width: 62ch; }
+.facts { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 1px; background: var(--line); border: 1px solid var(--line); border-radius: 6px; overflow: hidden; }
+.facts div { background: var(--surface); padding: 12px 14px; display: grid; gap: 4px; min-width: 0; }
+.facts dt { font: 500 11px/1 var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+.facts dd { margin: 0; font: 600 15px/1.3 var(--display); overflow-wrap: anywhere; }
+.facts dd.warn { color: var(--warn); }
+ul { margin: 0; padding-left: 1.2em; display: grid; gap: 6px; }
+code { font: 14px var(--mono); background: var(--code-bg); padding: 1px 5px; border-radius: 3px; overflow-wrap: anywhere; }
+pre { margin: 0; background: var(--code-bg); border-radius: 6px; padding: 14px 16px; overflow-x: auto; font: 13.5px/1.55 var(--mono); }
+pre code { background: none; padding: 0; }
+.callout { border: 1px solid var(--warn); border-radius: 6px; padding: 14px 16px; display: grid; gap: 6px; background: var(--surface); }
+.callout strong { font-family: var(--display); color: var(--warn); }
+.files { width: 100%; border-collapse: collapse; font-size: 15px; }
+.files td { padding: 8px 0; border-bottom: 1px solid var(--line); vertical-align: top; }
+.files td:first-child { width: 11rem; padding-right: 12px; }
+.tablewrap { overflow-x: auto; }
+footer { font: 13px var(--mono); color: var(--muted); border-top: 1px solid var(--line); padding-top: 14px; }
+a { color: var(--accent); }
+a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+</style>
+
+<main>
+  <header>
+    <span class="eyebrow">Step 00 · Phase 0 · 8 Oct 2026</span>
+    <h1>Project setup</h1>
+    <p class="lede">Repo, Python environment and working rules for the Humanoid robot-learning internship challenge. No robot code yet; this step only prepares the ground.</p>
+  </header>
+
+  <dl class="facts">
+    <div><dt>Repo</dt><dd>mi-robotics/HumanoidsChallenge</dd></div>
+    <div><dt>Conda env</dt><dd>humanoidschallenge</dd></div>
+    <div><dt>Python</dt><dd>3.10.22</dd></div>
+    <div><dt>Deadline</dt><dd class="warn">Fri 9 Oct, 23:59 BST</dd></div>
+  </dl>
+
+  <section>
+    <h2>The challenge, in their words</h2>
+    <p>Use real data collected by the applicant (a phone is enough) to drive a robotic manipulator in a simple simulation environment such as LIBERO. Showcase knowledge of VLAs and/or world models. Submit a public GitHub repo with a README covering how to run it, example outputs, design choices, and what worked and what didn't.</p>
+    <p>They judge on: creativity (the collected data must play a role), policy performance in sim and/or world-model prediction quality, implementation simplicity, and clear results "without AI slop".</p>
+  </section>
+
+  <section class="callout">
+    <strong>Timeline risk</strong>
+    <p>The posting gives the deadline as Friday 9 October 2026, 23:59 BST. Today is 8 October, so about 1.5 days remain. The full plan (6 phases, 50–100 teleop episodes, two trained models) does not fit that window. We need to cut scope to a minimal end-to-end path before starting Phase 1.</p>
+  </section>
+
+  <section>
+    <h2>What we did</h2>
+    <ul>
+      <li>Read <code>PROJECT_PLAN.md</code> and the challenge posting.</li>
+      <li>Created conda env <code>humanoidschallenge</code> with Python 3.10. LIBERO and robosuite 1.4 target 3.8–3.10, so 3.10 is the newest safe choice. No packages installed yet; each step installs what it needs.</li>
+      <li>Initialised git, set <code>origin</code> to <code>git@github.com:mi-robotics/HumanoidsChallenge.git</code>, pushed <code>main</code>.</li>
+      <li>Wrote <code>CLAUDE.md</code> with the working rules: one step at a time, no speculative code, a report and tracker update after every step.</li>
+      <li>Started a progress tracker and this step report, both kept as HTML under <code>docs/</code> and published as pages.</li>
+    </ul>
+  </section>
+
+  <section>
+    <h2>Commands</h2>
+<pre><code>conda create -n humanoidschallenge python=3.10 pip
+git init -b main
+git remote add origin git@github.com:mi-robotics/HumanoidsChallenge.git
+git add . &amp;&amp; git commit -m "Project setup"
+git push -u origin main</code></pre>
+  </section>
+
+  <section>
+    <h2>Files added</h2>
+    <div class="tablewrap"><table class="files">
+      <tr><td><code>CLAUDE.md</code></td><td>Context and working rules for coding sessions.</td></tr>
+      <tr><td><code>.gitignore</code></td><td>Keeps recorded data and video files out of git.</td></tr>
+      <tr><td><code>docs/tracker.html</code></td><td>Progress tracker across all phases.</td></tr>
+      <tr><td><code>docs/steps/00-setup.html</code></td><td>This report.</td></tr>
+    </table></div>
+  </section>
+
+  <section>
+    <h2>Next</h2>
+    <p>Agree a cut-down scope that fits the deadline, then start Phase 1, step 1: a sim scene with a Panda arm, table, cup and plate, and a gripper we can move to target positions.</p>
+  </section>
+
+  <footer>HumanoidsChallenge · docs/steps/00-setup.html</footer>
+</main>
