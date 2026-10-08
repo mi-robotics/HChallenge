@@ -32,10 +32,13 @@ img.result { display: block; width: 100%; max-width: 100%; border-radius: 6px; b
     <h1>Hand → robot: pinch point and grasp timing</h1>
   </header>
 
+  <video src="media/phase1/task7/pinch.mp4" controls autoplay muted loop playsinline aria-label="Five demos tiled in a grid. A dot marks the pinch point between thumb and index tips with a one-second trail: green while the gripper command is open, red while closed. A label shows the thumb-index distance and the gripper state." style="display:block;width:100%;aspect-ratio:8/3;border-radius:6px;border:1px solid var(--line);background:var(--surface)"></video>
+
   <img class="result" src="media/phase1/task7/retarget.png" alt="Left: top-down pinch-point paths of the five demos with grasp dots at different cup start positions and release crosses all on one spot, the saucer. Right: thumb-index distance over time per demo with the gripper-closed interval shaded and the 2.5 and 3.0 cm thresholds dashed.">
 
   <ul class="files">
-    <li><a href="https://github.com/mi-robotics/HumanoidsChallenge/blob/main/replay/retarget.py" target="_blank" rel="noopener">replay/retarget.py</a><span>Pinch point → gripper target (relative to the grasp point); grasp/release detection; writes retarget.npz and this plot</span></li>
-    <li><a href="https://github.com/mi-robotics/HumanoidsChallenge/blob/main/media/phase1/task7/retarget.png" target="_blank" rel="noopener">media/phase1/task7/retarget.png</a><span>This plot</span></li>
+    <li><a href="https://github.com/mi-robotics/HumanoidsChallenge/blob/main/replay/retarget.py" target="_blank" rel="noopener">replay/retarget.py</a><span>Pinch point → gripper target (relative to the grasp point); grasp/release detection; writes retarget.npz, the plot and the video</span></li>
+    <li><a href="https://github.com/mi-robotics/HumanoidsChallenge/blob/main/media/phase1/task7/pinch.mp4" target="_blank" rel="noopener">media/phase1/task7/pinch.mp4</a><span>The video</span></li>
+    <li><a href="https://github.com/mi-robotics/HumanoidsChallenge/blob/main/media/phase1/task7/retarget.png" target="_blank" rel="noopener">media/phase1/task7/retarget.png</a><span>The plot</span></li>
   </ul>
 </main>

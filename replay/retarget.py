@@ -14,12 +14,20 @@
 Writes retarget.npz to each demo folder:
   t [N], rel [N,3] pinch relative to the grasp point (m), gripper [N] (-1 open, +1 close),
   i_grasp, i_release, real_grasp [3], real_release [3] (table frame, m)
-and media/phase1/task7/retarget.png.
+and media/phase1/task7/retarget.png. Also renders pinch_overlay.mp4 per demo (cleaned pinch point projected
+into the camera image, gripper state) and tiles them into media/phase1/task7/pinch.mp4.
 """
+import json
+import subprocess
 import sys
 from pathlib import Path
 
+import cv2
 import numpy as np
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from to_table import demo_marker_pose  # noqa: E402
+from track_hand import INDEX_TIP, THUMB_TIP  # noqa: E402
 
 ROOT = Path(__file__).resolve().parents[1]
 MEDIA = ROOT / "media" / "phase1" / "task7"
@@ -111,6 +119,72 @@ def plot(results):
     print("wrote", MEDIA / "retarget.png")
 
 
+def render(demo, out):
+    """Draw the signal that drives the robot on the colour video: the cleaned pinch point (projected from
+    the table frame back into the image) with a 1 s trail, the raw thumb/index tips, and the gripper state."""
+    demo = Path(demo)
+    meta = json.loads((demo / "meta.json").read_text())
+    K, dist = np.array(meta["camera_matrix"]), np.array(meta["dist_coeffs"])
+    R, t, _ = demo_marker_pose(demo, K, dist)
+    hand = np.load(demo / "hand.npz")
+    t_cam = (hand["t_ms"] - hand["t_ms"][0]) / 1000
+    pinch = out["rel"] + out["real_grasp"]  # table frame, 20 Hz
+    pinch30 = np.stack([np.interp(t_cam, out["t"], pinch[:, j]) for j in range(3)], 1)
+    uv = cv2.projectPoints(pinch30, cv2.Rodrigues(R)[0], t, K, dist)[0].reshape(-1, 2)
+    closed = np.interp(t_cam, out["t"], (out["gripper"] > 0).astype(float)) > 0.5
+    aperture = np.interp(t_cam, out["t"], np.linalg.norm(  # cleaned thumb-index distance
+        np.load(demo / "traj.npz")["thumb"] - np.load(demo / "traj.npz")["index"], axis=1))
+
+    w, h = meta["image_size"]
+    cap = cv2.VideoCapture(str(demo / "color.mp4"))
+    ff = subprocess.Popen(["ffmpeg", "-y", "-loglevel", "error", "-f", "rawvideo", "-pix_fmt", "bgr24", "-s", f"{w}x{h}",
+                           "-r", str(meta["fps"]), "-i", "-", "-c:v", "libx264", "-crf", "23", "-pix_fmt", "yuv420p",
+                           str(demo / "pinch_overlay.mp4")], stdin=subprocess.PIPE)
+    green, red, white = (60, 200, 60), (40, 40, 230), (255, 255, 255)
+    trail = int(meta["fps"])
+    for i in range(len(t_cam)):
+        ok, img = cap.read()
+        if not ok:
+            break
+        c = red if closed[i] else green
+        for j in range(max(0, i - trail), i):
+            cv2.line(img, tuple(uv[j].astype(int)), tuple(uv[j + 1].astype(int)), c, 3, cv2.LINE_AA)
+        if hand["detected"][i]:
+            th, ix = hand["uv"][i, THUMB_TIP].astype(int), hand["uv"][i, INDEX_TIP].astype(int)
+            cv2.line(img, tuple(th), tuple(ix), white, 2, cv2.LINE_AA)
+            for q in (th, ix):
+                cv2.circle(img, tuple(q), 6, white, -1, cv2.LINE_AA)
+        cv2.circle(img, tuple(uv[i].astype(int)), 13, c, -1, cv2.LINE_AA)
+        cv2.circle(img, tuple(uv[i].astype(int)), 13, white, 2, cv2.LINE_AA)
+        label = f"thumb-index {aperture[i] * 100:4.1f} cm   gripper {'CLOSED' if closed[i] else 'OPEN'}"
+        (tw, _), _ = cv2.getTextSize(label, cv2.FONT_HERSHEY_SIMPLEX, 1.0, 2)
+        cv2.rectangle(img, (12, 12), (36 + tw, 62), (0, 0, 0), -1)
+        cv2.putText(img, label, (24, 48), cv2.FONT_HERSHEY_SIMPLEX, 1.0, c, 2, cv2.LINE_AA)
+        if not hand["detected"][i]:
+            cv2.putText(img, "hand not detected: interpolated", (24, 100), cv2.FONT_HERSHEY_SIMPLEX, 0.9,
+                        (0, 200, 255), 2, cv2.LINE_AA)
+        ff.stdin.write(img.tobytes())
+    ff.stdin.close()
+    ff.wait()
+
+
+def tile(demos, name, out_path):
+    """5 demo videos -> one 3x2 grid (640x360 tiles)."""
+    n = len(demos)
+    f = "".join(f"[{i}:v]scale=640:360,drawtext=text='demo {i + 1}':x=10:y=330:fontsize=22:fontcolor=white:"
+                f"box=1:boxcolor=black@0.5[v{i}];" for i in range(n))
+    layout = "|".join(["0_0", "w0_0", "w0+w1_0", "0_h0", "w0_h0", "w0+w1_h0"][:n + 1])
+    cmd = ["ffmpeg", "-y", "-loglevel", "error"]
+    for d in demos:
+        cmd += ["-i", str(Path(d) / name)]
+    cmd += ["-f", "lavfi", "-i", "color=c=black:s=640x360:r=30", "-filter_complex",
+            f"{f}[{n}:v]trim=duration=12[v{n}];{''.join(f'[v{i}]' for i in range(n + 1))}"
+            f"xstack=inputs={n + 1}:layout={layout}:shortest=0,trim=duration=11.3[out]",
+            "-map", "[out]", "-c:v", "libx264", "-crf", "26", "-pix_fmt", "yuv420p", str(out_path)]
+    subprocess.run(cmd, check=True)
+    print("wrote", out_path)
+
+
 if __name__ == "__main__":
     demos = sys.argv[1:] or sorted(str(p) for p in (ROOT / "data" / "demos").iterdir() if p.is_dir())
     results = [retarget(d) for d in demos]
@@ -118,3 +192,6 @@ if __name__ == "__main__":
     print(f"release points: spread (std) x {rel[:, 0].std():.1f} y {rel[:, 1].std():.1f} z {rel[:, 2].std():.1f} cm "
           "(the saucer did not move between demos)")
     plot(results)
+    for d, r in zip(demos, results):
+        render(d, r[0])
+    tile(demos, "pinch_overlay.mp4", MEDIA / "pinch.mp4")
