@@ -1,0 +1,54 @@
+<title>Step 1.9 · Sim Replay</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;700;800&family=JetBrains+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: single column. Title, the task video, then the files that produced it */
+:root {
+  --bg: #f5f6f8; --surface: #ffffff; --fg: #1a1e26; --muted: #5d6573; --line: #dde1e8; --accent: #2d4fd0;
+  --display: "Archivo", "Helvetica Neue", Arial, sans-serif;
+  --mono: "JetBrains Mono", ui-monospace, Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #12151b; --surface: #1a1e26; --fg: #e6e9ef; --muted: #98a0ae; --line: #2c323d; --accent: #8aa2ff; color-scheme: dark } }
+:root[data-theme="dark"] {
+  --bg: #12151b; --surface: #1a1e26; --fg: #e6e9ef; --muted: #98a0ae; --line: #2c323d; --accent: #8aa2ff; color-scheme: dark }
+
+body { background: var(--bg); color: var(--fg); font: 15px/1.5 var(--display); padding-inline: 16px; padding-block: 40px 64px; }
+main { max-width: 60rem; margin: 0 auto; display: grid; gap: 28px; }
+.eyebrow { font: 500 12px/1 var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+h1 { font: 800 clamp(28px, 6vw, 38px)/1.1 var(--display); margin: 10px 0 0; text-wrap: balance; }
+video { display: block; width: 100%; max-width: 100%; aspect-ratio: 64 / 27; border-radius: 6px; border: 1px solid var(--line); background: var(--surface); }
+figure { margin: 0; display: grid; gap: 8px; }
+figcaption { font: 13px/1.5 var(--mono); color: var(--muted); }
+.files { list-style: none; margin: 0; padding: 0; display: grid; }
+.files li { display: grid; grid-template-columns: minmax(0, 13rem) 1fr; gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--line); }
+.files a { font: 13.5px var(--mono); color: var(--accent); overflow-wrap: anywhere; }
+.files a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.files span { color: var(--muted); }
+@media (max-width: 480px) { .files li { grid-template-columns: 1fr; gap: 2px; } }
+</style>
+
+<main>
+  <header>
+    <span class="eyebrow">Step 1.9 · Phase 1</span>
+    <h1>Real demo → sim replay</h1>
+  </header>
+
+  <figure>
+    <video src="media/phase1/task9/replay.mp4" controls autoplay muted loop playsinline aria-label="Five demos, each shown as the real recording next to the sim replay from the same viewpoint; the Panda picks up the mug by the rim and puts it on the plate in every demo."></video>
+    <figcaption>With rim-grasp constraints: 5 / 5 cups on the plate</figcaption>
+  </figure>
+
+  <figure>
+    <video src="media/phase1/task9/replay_raw.mp4" controls muted loop playsinline aria-label="The same five demos replayed by following the hand path exactly; in three of them the mug is knocked over or dragged off the plate."></video>
+    <figcaption>Hand path replayed as is: 2 / 5</figcaption>
+  </figure>
+
+  <ul class="files">
+    <li><a href="https://github.com/mi-robotics/HumanoidsChallenge/blob/main/replay/replay.py" target="_blank" rel="noopener">replay/replay.py</a><span>Replay with rim-grasp constraints (or --raw), success check, side-by-side videos</span></li>
+    <li><a href="https://github.com/mi-robotics/HumanoidsChallenge/blob/main/replay/retarget.py" target="_blank" rel="noopener">replay/retarget.py</a><span>Hand → robot commands (step 1.7)</span></li>
+    <li><a href="https://github.com/mi-robotics/HumanoidsChallenge/blob/main/replay/scene_match.py" target="_blank" rel="noopener">replay/scene_match.py</a><span>Matched scene and camera (step 1.8)</span></li>
+    <li><a href="https://github.com/mi-robotics/HumanoidsChallenge/blob/main/media/phase1/task9/replay.mp4" target="_blank" rel="noopener">media/phase1/task9/replay.mp4</a><span>Constrained replay video</span></li>
+    <li><a href="https://github.com/mi-robotics/HumanoidsChallenge/blob/main/media/phase1/task9/replay_raw.mp4" target="_blank" rel="noopener">media/phase1/task9/replay_raw.mp4</a><span>Raw replay video</span></li>
+  </ul>
+</main>

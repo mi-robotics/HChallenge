@@ -72,9 +72,9 @@ project/
 ### Done when
 
 - [x] Sim scene works and the gripper can be moved to target positions
-- [ ] Hand positions are in table coordinates (sanity check: they land on the table, not floating or below it)
-- [ ] The sim robot follows the motion from my video
-- [ ] I have a side-by-side video: real demo | sim replay
+- [x] Hand positions are in table coordinates (sanity check: they land on the table, not floating or below it)
+- [x] The sim robot follows the motion from my video
+- [x] I have a side-by-side video: real demo | sim replay
 
 ### Notes
 
@@ -88,6 +88,7 @@ project/
 - **1.6** `replay/clean.py` → `traj.npz` (t, wrist, thumb, index, aperture, filled) at 20 Hz. Spike rule (> 3 cm from a 7-frame rolling median, or z < −1 cm) dropped only 6 samples, all on the index tip. Gaps filled by interpolation: up to 26 frames in demos 4–5 (longest 0.7 s). Zero-phase Gaussian smoothing (σ = 67 ms): wrist acceleration RMS 5–14 → 0.4–0.8 m/s², cleaned line stays on the raw points. Thumb–index distance works as a grasp signal: ~4.5 cm open on approach, ~1.5 cm while carrying (pinch on the mug), opens at release.
 - **1.7** Changed the mapping from wrist → gripper to **pinch point (thumb/index midpoint) → gripper fingertip centre**: it is where the fingers touch the mug, while the wrist sits 10+ cm above it at a pose-dependent offset. Target = pinch − pinch at grasp + sim rim-grasp point, so the real (~9 cm) and sim (13.5 cm) mug heights cancel; no rotation or scale. Gripper: one grasp per demo; close at the first thumb–index < 2.5 cm, release at the first > 3.0 cm after a 3 cm lift. A plain hysteresis gave extra events (relaxed hand re-closing after release, a 0.35 s flicker in demo 4, demo 4 releasing by moving away with fingers only at ~3.3 cm); debouncing broke demos 2–3. Check: all 5 release points land within std 0.2 / 0.4 / 0.6 cm (x/y/z) of each other, i.e. on the saucer, which did not move; grasp heights 6.9–8.5 cm (just under a ~9 cm mug's rim); lift 7–15 cm.
 - **1.8** Depth-based cup/saucer detection failed: both are white and the D405 returns almost no depth on blank white surfaces (the "saucer" it found was a cable). Located them from the hand instead: grasp point = on the cup, release point = over the saucer. Projected into the first frame, the grasp point lands on the mug rim and the release xy (at saucer height) on the saucer centre in all 5 demos. Sim: cup at the BDDL region centre (−0.11, 0), plate at cup + (release − grasp)xy (15–38 cm away). All replay targets within 0.43–0.78 m of the robot base (Panda reach 0.855 m) and ≥ 9 cm above the table. Added a sim camera at the D405's pose relative to the cup (same orientation, fovy 58.6°) for side-by-side videos; needed `sim.forward()` after moving it.
+- **1.9** `replay/replay.py`: matched scene, one control step per 20 Hz sample, LIBERO On(cup, plate) after 1 s of settling. **Raw hand path: 2/5.** Failures were all the embodiment gap (I pinch from the side; the robot grasps with one finger inside the mug): the gripper knocked the mug over on approach (demo 3), dragged it off the plate when moving away sideways after release (demo 2), and closed while still descending (demo 5). **With three local rim-grasp constraints: 5/5**, cups end 0.1–1.8 cm from the plate centre, sim cup lift 6.7–13.8 cm vs hand 7.2–15.3 cm. Constraints: (1) approach from ≥ 8 cm above the grasp point until the *gripper* (not the target, the arm lags fast motion by up to 10 cm) is within 3 cm horizontally; (2) at the grasp, 0.5 s arrive with fingers open, then 0.5 s close; (3) after release, hold 0.25 s and rise 10 cm before following the hand. A first version that applied the clearance to the target and closed during the settle got 3/5. Tracking error (gripper vs target) median 8–34 mm, p95 30–91 mm: the OSC controller lags fast hand motion (up to 0.43 m/s).
 
 ### Watch out for
 
