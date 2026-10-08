@@ -32,16 +32,17 @@ img.result { display: block; width: 100%; max-width: 100%; border-radius: 6px; b
 <main>
   <header>
     <span class="eyebrow">Step 3.2 · Phase 3</span>
-    <h1>Tracking the hand points with CoTracker</h1>
+    <h1>Tracking hand and mug points with CoTracker</h1>
   </header>
 
   <figure>
-    <video src="media/phase3/task2/tracks.mp4" controls autoplay muted loop playsinline aria-label="Five demo videos tiled; on each hand, coloured dots from CoTracker sit inside white rings from MediaPipe as the hand picks up the mug and puts it on the saucer."></video>
-    <figcaption>Dots = CoTracker (blue wrist + knuckles, orange thumb tip, green index tip), white rings = MediaPipe. Median 2–5 px apart, p95 4–30 px.</figcaption>
+    <video src="media/phase3/task2/tracks.mp4" controls autoplay muted loop playsinline aria-label="Five demo videos tiled with a legend in the sixth cell; coloured dots from CoTracker on the hand sit inside white rings from MediaPipe, yellow dots on the mug move with it to the saucer, and points that are hidden turn red."></video>
+    <figcaption>Hand and mug points tracked by CoTracker (legend in the last cell), white rings = MediaPipe. Red = occluded, from CoTracker plus a depth check against MediaPipe's 3D hand fitted to the D405 points. Hand tracks are a median 2–5 px from MediaPipe; mug tracks a median 1–6 px from the hand-derived stand-in mug.</figcaption>
   </figure>
 
   <ul class="files">
-    <li><a href="https://github.com/mi-robotics/HumanoidsChallenge/blob/main/flow/track_points.py" target="_blank" rel="noopener">flow/track_points.py</a><span>CoTracker3 offline, queries from MediaPipe every 0.5 s; writes cotracker.npz and this video</span></li>
+    <li><a href="https://github.com/mi-robotics/HumanoidsChallenge/blob/main/flow/track_points.py" target="_blank" rel="noopener">flow/track_points.py</a><span>CoTracker3 on hand and mug points, occlusion check; writes cotracker.npz and this video</span></li>
+    <li><a href="https://github.com/mi-robotics/HumanoidsChallenge/blob/main/replay/track_hand.py" target="_blank" rel="noopener">replay/track_hand.py</a><span>Now also saves MediaPipe's metric 3D hand, used for the occlusion check</span></li>
     <li><a href="https://github.com/mi-robotics/HumanoidsChallenge/blob/main/flow/FORMAT.md" target="_blank" rel="noopener">flow/FORMAT.md</a><span>Which points are tracked (step 3.1)</span></li>
     <li><a href="https://github.com/mi-robotics/HumanoidsChallenge/blob/main/media/phase3/task2/tracks.mp4" target="_blank" rel="noopener">media/phase3/task2/tracks.mp4</a><span>This video</span></li>
   </ul>

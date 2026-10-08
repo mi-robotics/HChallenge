@@ -4,7 +4,8 @@
 
 Writes to each demo folder:
   hand.npz          per frame t: detected [T], score [T], uv [T,21,2] pixels, depth [T,21] metres
-                    (0 = no valid depth), t_ms [T]
+                    (0 = no valid depth), world [T,21,3] MediaPipe's metric 3D hand shape (metres, around the
+                    hand's centre, camera-aligned axes; used for the occlusion check in step 3.2), t_ms [T]
   hand_overlay.mp4  colour video with the tracked hand drawn on it
 """
 import csv
@@ -62,7 +63,7 @@ def track(demo):
 
     T = len(t_ms)
     detected, score = np.zeros(T, bool), np.zeros(T)
-    uv, depth = np.zeros((T, 21, 2)), np.zeros((T, 21))
+    uv, depth, world = np.zeros((T, 21, 2)), np.zeros((T, 21)), np.zeros((T, 21, 3))
     cap = cv2.VideoCapture(str(demo / "color.mp4"))
     w, h = size
     out = subprocess.Popen(["ffmpeg", "-y", "-loglevel", "error", "-f", "rawvideo", "-pix_fmt", "bgr24",
@@ -77,12 +78,13 @@ def track(demo):
             int(t_ms[t] - t_ms[0]))
         # Checked on the demos: the moving (right) hand is labelled "Right" on this camera; the left
         # hand resting on the keyboard is "Left".
-        rights = [(hd[0].score, lm) for hd, lm in zip(res.handedness, res.hand_landmarks)
+        rights = [(hd[0].score, lm, wl) for hd, lm, wl in zip(res.handedness, res.hand_landmarks, res.hand_world_landmarks)
                   if hd[0].category_name == "Right"]
         if rights:
-            s, lm = max(rights, key=lambda x: x[0])
+            s, lm, wl = max(rights, key=lambda x: x[0])
             detected[t], score[t] = True, s
             uv[t] = [(p.x * w, p.y * h) for p in lm]
+            world[t] = [(p.x, p.y, p.z) for p in wl]
             d_m = d_raw.astype(np.float32) * meta["depth_scale"]
             depth[t] = [depth_at(d_m, p) for p in uv[t]]
             for a, b in CONNECTIONS:
@@ -98,7 +100,7 @@ def track(demo):
     out.wait()
     landmarker.close()
 
-    np.savez(demo / "hand.npz", detected=detected, score=score, uv=uv, depth=depth, t_ms=t_ms)
+    np.savez(demo / "hand.npz", detected=detected, score=score, uv=uv, depth=depth, world=world, t_ms=t_ms)
     key = depth[detected][:, [WRIST, THUMB_TIP, INDEX_TIP]]
     print(f"{demo.name}: right hand in {detected.mean() * 100:.0f}% of {T} frames | valid depth when detected: "
           f"wrist {(key[:, 0] > 0).mean() * 100:.0f}%  thumb tip {(key[:, 1] > 0).mean() * 100:.0f}%  "

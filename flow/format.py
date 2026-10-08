@@ -5,9 +5,9 @@
 Running it builds an episode in this format from stand-in data, checks it, and draws three samples on the camera
 image (media/phase3/task1/flow_samples.jpg):
   hand  step 1.5 MediaPipe landmarks (until CoTracker, step 3.2)
-  cup   derived from the hand (until step 3.4; the D405 has no depth on the white mug): 4 rim + 4 base points on a
-        cylinder (radius CUP_R_M) whose centre is CUP_R_M from the grasp point along thumb -> index (the index tip
-        is inside the mug). The cup is still until the grasp, moves with the pinch point (translation only) until the
+  cup   derived from the hand (until step 3.4; the D405 has no depth on the white mug): two rings of 4 points on the
+        camera-facing half of a cylinder (radius CUP_R_M, at 80% and 35% of the grasp height) whose centre is
+        CUP_R_M from the grasp point along thumb -> index (the index tip is inside the mug). The cup is still until the grasp, moves with the pinch point (translation only) until the
         release, then stays where it was let go. All marked visible. (A rigid fit to the back of the hand, which
         would also rotate the cup, put the cup base 1-24 cm above the table at release: rotation noise times the
         hand-to-cup distance. Translation only gives 0.8-2.3 cm, i.e. on the ~1.5 cm saucer.)
@@ -45,11 +45,12 @@ def fill_hidden(p, visible):
     return out
 
 
-def from_mediapipe(demo):
-    """Hand flow for a whole episode from hand_table.npz (30 fps) -> (t [N], hand [6, N, 4]) at HZ."""
+def from_mediapipe(demo, hz=HZ):
+    """Hand flow for a whole episode from hand_table.npz (30 fps) -> (t [N], hand [6, N, 4], camera frame [N]) at
+    hz, or at every camera frame if hz is None."""
     ht, hand = np.load(demo / "hand_table.npz"), np.load(demo / "hand.npz")
     t_cam = (hand["t_ms"] - hand["t_ms"][0]) / 1000
-    t = np.arange(0, t_cam[-1] + 1e-9, 1 / HZ)
+    t = t_cam if hz is None else np.arange(0, t_cam[-1] + 1e-9, 1 / hz)
     frame = np.abs(t_cam[None] - t[:, None]).argmin(1)  # nearest camera frame per flow step
     flow = np.zeros((len(HAND_POINTS), len(t), 4), DTYPE)
     for i, lm in enumerate(HAND_MEDIAPIPE):
@@ -68,9 +69,10 @@ def cup_from_hand(demo, t, hand):
     g = (thumb + index) / 2
     u = (index - thumb)[:2] / np.linalg.norm((index - thumb)[:2])
     c = g[:2] + CUP_R_M * u
-    a = np.arctan2(-u[1], -u[0]) + np.arange(4) * np.pi / 2  # first point on the grasp side
+    to_cam = np.load(demo / "hand_table.npz")["cam_in_table"][:2] - c
+    a = np.arctan2(to_cam[1], to_cam[0]) + np.radians([-60, -20, 20, 60])  # camera-facing half
     ring = np.c_[c[0] + CUP_R_M * np.cos(a), c[1] + CUP_R_M * np.sin(a)]
-    pts = np.r_[np.c_[ring, np.full(4, g[2])], np.c_[ring, np.zeros(4)]]  # rim at grasp height, base on the table
+    pts = np.r_[np.c_[ring, np.full(4, 0.8 * g[2])], np.c_[ring, np.full(4, 0.35 * g[2])]]
     pinch = (hand[1, :, :3] + hand[2, :, :3]) / 2
     shift = pinch[np.clip(np.arange(len(t)), i_grasp, i_release)] - g  # [N, 3]
     cup = np.ones((len(pts), len(t), 4), DTYPE)
@@ -145,8 +147,8 @@ if __name__ == "__main__":
           + ", ".join(f"{n} {hand[i, :, 3].mean() * 100:.0f}%" for i, n in enumerate(HAND_POINTS)) + ")")
     rt = np.load(demo / "retarget.npz")
     i_grasp, i_release = (int(np.abs(t - rt["t"][int(rt[k])]).argmin()) for k in ("i_grasp", "i_release"))
-    base = cup[4:, :, :3]
-    print(f"  cup at release: base z {base[:, i_release, 2].mean() * 100:+.1f} cm, centre xy "
-          f"{np.round(base[:, i_release, :2].mean(0) * 100, 1)} cm; moved {np.linalg.norm(base[:, -1].mean(0) - base[:, 0].mean(0)) * 100:.1f} cm")
+    c0, c1 = cup[:, 0, :3].mean(0), cup[:, i_release, :3].mean(0)
+    print(f"  cup at release: {(c1 - c0)[2] * 100:+.1f} cm above its start (on the ~1.5 cm saucer), centre xy "
+          f"{np.round(c1[:2] * 100, 1)} cm; moved {np.linalg.norm(c1 - c0) * 100:.1f} cm")
     draw_samples(demo, t, hand, cup, frame, [max(0, i_grasp - 8), i_grasp + 12, max(0, i_release - 10)],
                  root / "media" / "phase3" / "task1" / "flow_samples.jpg")
