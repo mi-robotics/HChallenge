@@ -1,0 +1,53 @@
+<title>Step 3.1 · Flow Format</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;700;800&family=JetBrains+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: single column. Title, the format at a glance, an example image, then the files */
+:root {
+  --bg: #f5f6f8; --surface: #ffffff; --fg: #1a1e26; --muted: #5d6573; --line: #dde1e8; --accent: #2d4fd0;
+  --display: "Archivo", "Helvetica Neue", Arial, sans-serif;
+  --mono: "JetBrains Mono", ui-monospace, Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #12151b; --surface: #1a1e26; --fg: #e6e9ef; --muted: #98a0ae; --line: #2c323d; --accent: #8aa2ff; color-scheme: dark } }
+:root[data-theme="dark"] {
+  --bg: #12151b; --surface: #1a1e26; --fg: #e6e9ef; --muted: #98a0ae; --line: #2c323d; --accent: #8aa2ff; color-scheme: dark }
+
+body { background: var(--bg); color: var(--fg); font: 15px/1.5 var(--display); padding-inline: 16px; padding-block: 40px 64px; }
+main { max-width: 56rem; margin: 0 auto; display: grid; gap: 28px; }
+.eyebrow { font: 500 12px/1 var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+h1 { font: 800 clamp(28px, 6vw, 38px)/1.1 var(--display); margin: 10px 0 0; text-wrap: balance; }
+pre { margin: 0; padding: 14px 16px; background: var(--surface); border: 1px solid var(--line); border-radius: 6px; font: 13.5px/1.6 var(--mono); overflow-x: auto; }
+figcaption { font: 13px/1.5 var(--mono); color: var(--muted); }
+figure { margin: 0; display: grid; gap: 8px; }
+img.result { display: block; width: 100%; max-width: 100%; border-radius: 6px; border: 1px solid var(--line); background: var(--surface); }
+.files { list-style: none; margin: 0; padding: 0; display: grid; }
+.files li { display: grid; grid-template-columns: minmax(0, 13rem) 1fr; gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--line); }
+.files a { font: 13.5px var(--mono); color: var(--accent); overflow-wrap: anywhere; }
+.files a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.files span { color: var(--muted); }
+@media (max-width: 480px) { .files li { grid-template-columns: 1fr; gap: 2px; } }
+</style>
+
+<main>
+  <header>
+    <span class="eyebrow">Step 3.1 · Phase 3</span>
+    <h1>Action flow format</h1>
+  </header>
+
+  <pre>hand  float32 [6, 16, 4]   wrist, thumb tip, index tip, index / middle / pinky knuckle
+cup   float32 [8, 16, 4]   8 points on the mug
+      points × 16 steps at 10 Hz (now … +1.5 s) × (x, y, z, visible)
+      x, y, z in metres, table frame · visible = 0 → hidden, mask it</pre>
+
+  <figure>
+    <img class="result" src="media/phase3/task1/flow_samples.jpg" alt="Two frames from demo 1 with one flow sample drawn on each: 16 future positions of the six hand points, projected into the camera image. Left, 1.2 s before the grasp: short trails near the mug. Right, 1 s after the grasp: long trails carrying the mug towards the saucer. Back-of-hand points in blue, thumb tip in orange, index tip in green; white ring = step 0.">
+    <figcaption>Demo 1, two hand samples (MediaPipe stand-in until CoTracker in 3.2). Blue = wrist + knuckles, orange = thumb tip, green = index tip, white ring = now.</figcaption>
+  </figure>
+
+  <ul class="files">
+    <li><a href="https://github.com/mi-robotics/HumanoidsChallenge/blob/main/flow/FORMAT.md" target="_blank" rel="noopener">flow/FORMAT.md</a><span>The format: points, timesteps, frame, visibility, episode file, table → sim</span></li>
+    <li><a href="https://github.com/mi-robotics/HumanoidsChallenge/blob/main/flow/format.py" target="_blank" rel="noopener">flow/format.py</a><span>Constants, check(), MediaPipe example and this image</span></li>
+    <li><a href="https://github.com/mi-robotics/HumanoidsChallenge/blob/main/media/phase3/task1/flow_samples.jpg" target="_blank" rel="noopener">media/phase3/task1/flow_samples.jpg</a><span>This image</span></li>
+  </ul>
+</main>

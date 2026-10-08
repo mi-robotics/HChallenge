@@ -25,7 +25,7 @@ At the end: **real photo + instruction → flow → robot does the task in sim.*
 | Calibration | ArUco marker taped to the table | Gives a shared "table frame" for real and sim. Printer scales to 89%: marker is 89 mm, board squares 26.7 mm (set in `calibration/make_targets.py`). |
 | Hand tracking | MediaPipe Hands (fast, works live) | HaMeR only if needed offline for better quality. |
 | Point tracking | CoTracker (offline) | For clean action flow in the dataset. |
-| Flow format | Points × timesteps × (x, y, z, visible), in table coordinates | Same format everywhere. Defined in Phase 3. |
+| Flow format | hand [6, 16, 4] + cup [8, 16, 4]: points × timesteps (10 Hz) × (x, y, z, visible), metres, table frame | Defined in step 3.1: `flow/FORMAT.md`, constants in `flow/format.py`. |
 | Sim actions for the dataset | Offline replay of recorded videos; failed replays dropped | Changed after step 1.9: replay with rim-grasp constraints succeeded 5/5, so live teleop (Phase 2) was dropped. |
 | Compute | Laptop for recording + sim replay, Google Colab GPU for training | |
 | Deadline | ___ | |
@@ -127,6 +127,10 @@ Dropped after step 1.9. Offline replay of a recorded video already gets the sim 
 - [ ] Hand flow and cup flow can be extracted from any recorded video
 - [ ] Visualiser shows trails that match what my hand actually did
 - [ ] Slicing function produces training samples
+
+### Notes
+
+- **3.1** `flow/FORMAT.md` + `flow/format.py`. Hand points: wrist, thumb tip, index tip (pinch point and grasp signal), index/middle/pinky knuckles (back of the hand, gives orientation). Cup: 8 points. T = 16 at 10 Hz = now + 1.5 s ahead (~4 cm per step at the p95 hand speed 0.39 m/s). Absolute table-frame metres; hidden points interpolated only to avoid NaNs, flagged visible = 0 for masking; past the episode end the last frame repeats. Checked by building the hand flow for all 5 demos from the MediaPipe landmarks: 100–111 steps each, visible 93–100%. Open issue for 3.4: no D405 depth on the white mug.
 
 ### Watch out for
 
