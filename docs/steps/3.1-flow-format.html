@@ -41,13 +41,13 @@ cup   float32 [8, 16, 4]   8 points on the mug
       x, y, z in metres, table frame · visible = 0 → hidden, mask it</pre>
 
   <figure>
-    <img class="result" src="media/phase3/task1/flow_samples.jpg" alt="Two frames from demo 1 with one flow sample drawn on each: 16 future positions of the six hand points, projected into the camera image. Left, 1.2 s before the grasp: short trails near the mug. Right, 1 s after the grasp: long trails carrying the mug towards the saucer. Back-of-hand points in blue, thumb tip in orange, index tip in green; white ring = step 0.">
-    <figcaption>Demo 1, two hand samples (MediaPipe stand-in until CoTracker in 3.2). Blue = wrist + knuckles, orange = thumb tip, green = index tip, white ring = now.</figcaption>
+    <img class="result" src="media/phase3/task1/flow_samples.jpg" alt="Three frames from demo 1, each with one flow sample drawn on it: the next 16 positions of the six hand points and eight mug points, projected into the camera image. Left, just before the grasp: short hand trails, mug points still. Middle, after the grasp: hand and mug trails move together towards the saucer. Right, before the release: the mug points come down onto the saucer. Legend under the frames.">
+    <figcaption>Demo 1, three samples: before the grasp, carrying, before the release. Hand: MediaPipe until CoTracker (3.2). Mug: stand-in until 3.4 (no D405 depth on the white mug), 4 rim + 4 base points that move with the pinch point between grasp and release.</figcaption>
   </figure>
 
   <ul class="files">
     <li><a href="https://github.com/mi-robotics/HumanoidsChallenge/blob/main/flow/FORMAT.md" target="_blank" rel="noopener">flow/FORMAT.md</a><span>The format: points, timesteps, frame, visibility, episode file, table → sim</span></li>
-    <li><a href="https://github.com/mi-robotics/HumanoidsChallenge/blob/main/flow/format.py" target="_blank" rel="noopener">flow/format.py</a><span>Constants, check(), MediaPipe example and this image</span></li>
+    <li><a href="https://github.com/mi-robotics/HumanoidsChallenge/blob/main/flow/format.py" target="_blank" rel="noopener">flow/format.py</a><span>Constants, check(), stand-in hand and mug flow, and this image</span></li>
     <li><a href="https://github.com/mi-robotics/HumanoidsChallenge/blob/main/media/phase3/task1/flow_samples.jpg" target="_blank" rel="noopener">media/phase3/task1/flow_samples.jpg</a><span>This image</span></li>
   </ul>
 </main>

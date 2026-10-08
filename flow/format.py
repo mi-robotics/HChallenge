@@ -2,9 +2,15 @@
 
   python flow/format.py [data/demos/<demo>]     (default: first demo)
 
-Running it builds the hand part of an episode in this format from the step 1.5 MediaPipe landmarks (stand-in
-until CoTracker, step 3.2), checks it, and draws two samples on the camera image:
-media/phase3/task1/flow_samples.jpg.
+Running it builds an episode in this format from stand-in data, checks it, and draws three samples on the camera
+image (media/phase3/task1/flow_samples.jpg):
+  hand  step 1.5 MediaPipe landmarks (until CoTracker, step 3.2)
+  cup   derived from the hand (until step 3.4; the D405 has no depth on the white mug): 4 rim + 4 base points on a
+        cylinder (radius CUP_R_M) whose centre is CUP_R_M from the grasp point along thumb -> index (the index tip
+        is inside the mug). The cup is still until the grasp, moves with the pinch point (translation only) until the
+        release, then stays where it was let go. All marked visible. (A rigid fit to the back of the hand, which
+        would also rotate the cup, put the cup base 1-24 cm above the table at release: rotation noise times the
+        hand-to-cup distance. Translation only gives 0.8-2.3 cm, i.e. on the ~1.5 cm saucer.)
 """
 import json
 import sys
@@ -18,6 +24,7 @@ HAND_POINTS = ("wrist", "thumb_tip", "index_tip", "index_knuckle", "middle_knuck
 HAND_MEDIAPIPE = (0, 4, 8, 5, 9, 17)
 N_CUP_POINTS = 8
 DTYPE = np.float32
+CUP_R_M = 0.04
 
 
 def check(flow, n_points, n_steps=None):
@@ -52,7 +59,26 @@ def from_mediapipe(demo):
     return t.astype(DTYPE), flow, frame
 
 
-def draw_samples(demo, t, flow, frame, starts, out):
+def cup_from_hand(demo, t, hand):
+    """Stand-in cup flow [8, N, 4] (see module docstring)."""
+    rt = np.load(demo / "retarget.npz")
+    i_grasp = int(np.abs(t - rt["t"][int(rt["i_grasp"])]).argmin())
+    i_release = int(np.abs(t - rt["t"][int(rt["i_release"])]).argmin())
+    thumb, index = hand[1, i_grasp, :3], hand[2, i_grasp, :3]
+    g = (thumb + index) / 2
+    u = (index - thumb)[:2] / np.linalg.norm((index - thumb)[:2])
+    c = g[:2] + CUP_R_M * u
+    a = np.arctan2(-u[1], -u[0]) + np.arange(4) * np.pi / 2  # first point on the grasp side
+    ring = np.c_[c[0] + CUP_R_M * np.cos(a), c[1] + CUP_R_M * np.sin(a)]
+    pts = np.r_[np.c_[ring, np.full(4, g[2])], np.c_[ring, np.zeros(4)]]  # rim at grasp height, base on the table
+    pinch = (hand[1, :, :3] + hand[2, :, :3]) / 2
+    shift = pinch[np.clip(np.arange(len(t)), i_grasp, i_release)] - g  # [N, 3]
+    cup = np.ones((len(pts), len(t), 4), DTYPE)
+    cup[:, :, :3] = pts[:, None] + shift[None]
+    return cup
+
+
+def draw_samples(demo, t, hand, cup, frame, starts, out):
     import cv2
     sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "replay"))
     from to_table import demo_marker_pose
@@ -68,28 +94,40 @@ def draw_samples(demo, t, flow, frame, starts, out):
         if not ok:
             break
         frames.append(f)
-    # BGR of dataviz slots 1-3: back of hand (wrist + knuckles), thumb tip, index tip
-    colour = {0: (214, 120, 42), 3: (214, 120, 42), 4: (214, 120, 42), 5: (214, 120, 42), 1: (52, 104, 235), 2: (122, 175, 27)}
+    # BGR of dataviz slots 1-4: back of hand (wrist + knuckles), thumb tip, index tip, mug
+    blue, orange, green, yellow = (214, 120, 42), (52, 104, 235), (122, 175, 27), (0, 161, 237)
+    trails = [(hand[i], c) for i, c in enumerate([blue, orange, green, blue, blue, blue])] + [(p, yellow) for p in cup]
     tiles = []
     for s in starts:
         img = frames[frame[s]].copy()
-        for i in range(len(HAND_POINTS)):
-            win = flow[i, s:s + T]
+        for flow_i, c in trails:
+            win = flow_i[s:s + T]
             uv = cv2.projectPoints(win[:, :3].astype(np.float64), rvec, tv, K, dist)[0].reshape(-1, 2).astype(int)
             for k in range(len(uv) - 1):
-                cv2.line(img, tuple(uv[k]), tuple(uv[k + 1]), colour[i], 3, cv2.LINE_AA)
+                cv2.line(img, tuple(uv[k]), tuple(uv[k + 1]), c, 3, cv2.LINE_AA)
             for k, (u, v) in enumerate(uv):
-                if win[k, 3]:
-                    cv2.circle(img, (u, v), 5, colour[i], -1, cv2.LINE_AA)
-                else:
-                    cv2.circle(img, (u, v), 5, colour[i], 1, cv2.LINE_AA)  # hidden: hollow
+                cv2.circle(img, (u, v), 5, c, -1 if win[k, 3] else 1, cv2.LINE_AA)  # hidden: hollow
             cv2.circle(img, tuple(uv[0]), 9, (255, 255, 255), 2, cv2.LINE_AA)  # step 0 = now
         label = f"t0 = {t[s]:.1f} s, next {T} steps at {HZ} Hz"
         cv2.rectangle(img, (0, 0), (cv2.getTextSize(label, cv2.FONT_HERSHEY_SIMPLEX, 1.0, 2)[0][0] + 24, 48), (0, 0, 0), -1)
         cv2.putText(img, label, (12, 34), cv2.FONT_HERSHEY_SIMPLEX, 1.0, (255, 255, 255), 2, cv2.LINE_AA)
         tiles.append(cv2.resize(img, (960, 540)))
+    gap = np.full((540, 8, 3), 255, np.uint8)
+    row = np.hstack([x for tile in tiles for x in (tile, gap)][:-1])
+    legend = np.full((70, row.shape[1], 3), 255, np.uint8)
+    x = 20
+    for c, text, hollow in [(blue, "wrist + knuckles", False), (orange, "thumb tip", False), (green, "index tip", False),
+                            (yellow, "mug (stand-in, derived from the hand)", False), ((255, 255, 255), "now (step 0)", None),
+                            ((90, 90, 90), "hidden point", True)]:
+        if hollow is None:
+            cv2.circle(legend, (x + 12, 35), 10, (90, 90, 90), 2, cv2.LINE_AA)
+        else:
+            cv2.line(legend, (x, 35), (x + 24, 35), c, 3, cv2.LINE_AA)
+            cv2.circle(legend, (x + 12, 35), 6, c, 1 if hollow else -1, cv2.LINE_AA)
+        cv2.putText(legend, text, (x + 36, 44), cv2.FONT_HERSHEY_SIMPLEX, 0.85, (40, 30, 26), 2, cv2.LINE_AA)
+        x += 36 + cv2.getTextSize(text, cv2.FONT_HERSHEY_SIMPLEX, 0.85, 2)[0][0] + 44
     out.parent.mkdir(parents=True, exist_ok=True)
-    cv2.imwrite(str(out), np.hstack([tiles[0], np.full((540, 8, 3), 255, np.uint8), tiles[1]]), [cv2.IMWRITE_JPEG_QUALITY, 85])
+    cv2.imwrite(str(out), np.vstack([row, legend]), [cv2.IMWRITE_JPEG_QUALITY, 85])
     print("wrote", out)
 
 
@@ -97,12 +135,18 @@ if __name__ == "__main__":
     root = Path(__file__).resolve().parents[1]
     demo = Path(sys.argv[1]) if len(sys.argv) > 1 else sorted((root / "data" / "demos").iterdir())[0]
     t, hand, frame = from_mediapipe(demo)
+    cup = cup_from_hand(demo, t, hand)
     check(hand, len(HAND_POINTS))
+    check(cup, N_CUP_POINTS)
     sample = hand[:, 0:T]
     check(sample, len(HAND_POINTS), T)
     print(f"{demo.name}: episode hand {hand.shape} {hand.dtype}, {len(t) / HZ:.1f} s; sample {sample.shape}; "
           f"visible {hand[..., 3].mean() * 100:.0f}% (per point: "
           + ", ".join(f"{n} {hand[i, :, 3].mean() * 100:.0f}%" for i, n in enumerate(HAND_POINTS)) + ")")
     rt = np.load(demo / "retarget.npz")
-    i_grasp = int(round(rt["t"][int(rt["i_grasp"])] * HZ))
-    draw_samples(demo, t, hand, frame, [max(0, i_grasp - 12), i_grasp + 10], root / "media" / "phase3" / "task1" / "flow_samples.jpg")
+    i_grasp, i_release = (int(np.abs(t - rt["t"][int(rt[k])]).argmin()) for k in ("i_grasp", "i_release"))
+    base = cup[4:, :, :3]
+    print(f"  cup at release: base z {base[:, i_release, 2].mean() * 100:+.1f} cm, centre xy "
+          f"{np.round(base[:, i_release, :2].mean(0) * 100, 1)} cm; moved {np.linalg.norm(base[:, -1].mean(0) - base[:, 0].mean(0)) * 100:.1f} cm")
+    draw_samples(demo, t, hand, cup, frame, [max(0, i_grasp - 8), i_grasp + 12, max(0, i_release - 10)],
+                 root / "media" / "phase3" / "task1" / "flow_samples.jpg")
