@@ -1,7 +1,7 @@
 """Cup-on-plate sim scene: Panda + table + mug + plate in LIBERO, and helpers to move the gripper.
 
 Run `python sim/scene.py` to check the scene: free-space target accuracy, then a scripted
-rim-grasp pick-and-place. Saves an MP4 of the pick-and-place to media/.
+rim-grasp pick-and-place. Saves an MP4 of the pick-and-place to media/phase1/task1/.
 """
 import subprocess
 from pathlib import Path
@@ -125,7 +125,7 @@ if __name__ == "__main__":
 
     env.close()
 
-    out = Path(__file__).resolve().parents[1] / "media"
-    out.mkdir(exist_ok=True)
-    save_mp4(frames + [frames[-1]] * 20, out / "1.1_cup_on_plate.mp4")  # hold the last frame for 1 s
-    print(f"saved {len(frames)} frames to {out / '1.1_cup_on_plate.mp4'}")
+    out = Path(__file__).resolve().parents[1] / "media" / "phase1" / "task1"
+    out.mkdir(parents=True, exist_ok=True)
+    save_mp4(frames + [frames[-1]] * 20, out / "cup_on_plate.mp4")  # hold the last frame for 1 s
+    print(f"saved {len(frames)} frames to {out / 'cup_on_plate.mp4'}")
