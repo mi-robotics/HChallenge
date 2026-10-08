@@ -48,6 +48,18 @@ simple sim (LIBERO / robosuite). Submitted as a public GitHub repo with a README
   one finger inside, at cup centre + 4 cm in y (fingers close along world y).
 - Training runs on Google Colab GPU; sim + teleop run locally.
 
+## Camera and table frame
+
+- Intel RealSense D405 on USB 3, 1280×720 colour + depth aligned to colour, 30 fps.
+  `calibration/d405.py`: `D405().read()` returns (bgr, depth in metres, timestamp). Factory
+  intrinsics are used (verified against the board and the depth sensor; no checkerboard calibration).
+- Table frame = ArUco marker (4x4_50, id 0) at the origin: x away from the camera across the table
+  (= sim +x, the direction the robot reaches, cup → plate), y left, z up. `markers.marker_pose()`.
+- Printed targets are 89% of nominal size (printer scaling). Code uses `*_PRINTED` sizes from
+  `calibration/make_targets.py`. If the targets are reprinted, re-measure and update `PRINT_SCALE`.
+- Live view: `python calibration/d405.py` (only one process can hold the camera).
+  Check: `python calibration/d405.py check`.
+
 ## Repo
 
 - Remote: `git@github.com:mi-robotics/HumanoidsChallenge.git` (branch `main`).

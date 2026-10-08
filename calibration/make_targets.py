@@ -3,8 +3,8 @@
 - table_marker.pdf: ArUco marker that defines the table frame (taped to the table).
 - charuco_board.pdf: ChArUco board for camera calibration (taped to something flat).
 
-Print at 100% scale ("actual size", no fit-to-page), then measure with a ruler and put the
-real sizes in calibration/targets.yaml if they differ.
+Print at 100% scale ("actual size", no fit-to-page), then measure the 100 mm scale bar with a
+ruler and set PRINT_SCALE below. Detection code uses the *_PRINTED sizes.
 """
 from pathlib import Path
 
@@ -26,6 +26,13 @@ BOARD_DICT = cv2.aruco.DICT_5X5_100
 BOARD_SQUARES = (5, 7)
 SQUARE_MM = 30
 BOARD_MARKER_MM = 22
+
+# Our printer (Ubuntu, A4, "100%") shrinks pages: the 100 mm scale bar measures 89 mm on both
+# sheets. The D405 depth sensor independently implied 0.894.
+PRINT_SCALE = 0.89
+MARKER_MM_PRINTED = MARKER_MM * PRINT_SCALE
+SQUARE_MM_PRINTED = SQUARE_MM * PRINT_SCALE
+BOARD_MARKER_MM_PRINTED = BOARD_MARKER_MM * PRINT_SCALE
 
 
 def mm(x):

@@ -6,6 +6,8 @@ bddl==1.0.1
 easydict==1.13
 opencv-python==4.11.0.86
 pillow==12.3.0
+# Camera (step 1.2)
+pyrealsense2==2.58.4.10922
 # LIBERO import-time deps
 termcolor==3.3.0
 future==1.0.0

@@ -76,7 +76,7 @@ a { color: var(--accent); }
 
   <div class="overall">
     <div class="bar"><i id="bar" style="width:0%"></i></div>
-    <div class="row"><span id="summary">0 of 0 steps done</span><span>Updated 8 Oct 2026 · task changed to pick-and-place in 1.1</span></div>
+    <div class="row"><span id="summary">0 of 0 steps done</span><span>Updated 8 Oct 2026 · pick-and-place since 1.1 · D405 camera since 1.2</span></div>
   </div>
 
   <nav class="strip" id="strip" aria-label="Phases"></nav>
@@ -94,8 +94,8 @@ const PHASES = [
       ["Conda env humanoidschallenge (Python 3.10)", 1, "https://claude.ai/artifact/4LuyL24MuyqkmJNkJrxKCV"], ["CLAUDE.md", 1, "https://claude.ai/artifact/4LuyL24MuyqkmJNkJrxKCV"]] },
   { id: "p1", n: "1", name: "Video → sim replay", status: "active", goal: "Make the sim robot copy one recorded hand video, offline.",
     steps: [["Set up the sim scene: Panda, table, cup, plate; move gripper to targets, open/close", 1, "https://claude.ai/artifact/Cjd2LLGLv7cKccCVsHxw1W"],
-      ["Print and place the ArUco marker; calibrate the phone camera (checkerboard)", 2],
-      ["Record one 5–10 s demo of putting the cup on the plate, marker visible", 0],
+      ["Print and place the ArUco marker; set up the D405 camera and check its calibration", 1, "https://claude.ai/artifact/7SWiSAHz8QBr4RQkMVcQMZ"],
+      ["Record one 5–10 s demo of putting the cup on the plate, marker visible", 2],
       ["Track the hand in every frame with MediaPipe (wrist, fingertips)", 0],
       ["Convert to table coordinates (cm) using the marker", 0],
       ["Smooth and resample the trajectory to 20 Hz", 0],
@@ -103,7 +103,7 @@ const PHASES = [
       ["Match the starting scene: detect the cup in frame 1, place the sim cup there", 0],
       ["Replay in sim and record a video", 0]] },
   { id: "p2", n: "2", name: "Live teleop", status: "todo", goal: "Move my hand in front of the camera; the sim robot follows in real time.",
-    steps: [["Stream the phone camera to the laptop", 0], ["Run the Phase 1 pipeline live, every frame", 0], ["Smooth the motion with low lag", 0], ["Run the sim loop at 20 Hz on the latest hand position", 0],
+    steps: [["Stream the D405 to the sim loop", 0], ["Run the Phase 1 pipeline live, every frame", 0], ["Smooth the motion with low lag", 0], ["Run the sim loop at 20 Hz on the latest hand position", 0],
       ["Show sim next to the camera feed", 0], ["Measure latency hand → robot", 0], ["Add a record hotkey that saves an episode", 0], ["Add a reset that puts the sim cup where the real cup is", 0]] },
   { id: "p3", n: "3", name: "Action flows", status: "todo", goal: "Turn videos into point trails in one fixed format.",
     steps: [["Define the flow format in flow/FORMAT.md ([points, T, 4], T = 16 at 10 Hz)", 0], ["Run CoTracker on recorded videos", 0], ["Convert trails to table coordinates", 0],

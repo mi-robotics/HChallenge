@@ -21,8 +21,8 @@ At the end: **real photo + instruction → flow → robot does the task in sim.*
 |---|---|---|
 | Task | Pick up a cup and put it on a plate | Changed from pushing in step 1.1: in sim the mug tips on the plate rim or shoves the plate (0/21 push runs succeeded). A rim grasp (one finger inside the mug) succeeded 8/8. |
 | Simulator | LIBERO (robosuite underneath), Panda arm | May need a simple custom scene: table, cup, plate. |
-| Camera | Phone on a tripod first, head/chest mount later | Tripod is easier to debug. |
-| Calibration | ArUco marker taped to the table | Gives a shared "table frame" for real and sim. |
+| Camera | Intel RealSense D405 (RGB + depth, 1280×720 @ 30 fps) on a fixed mount | Switched from phone in step 1.2: factory intrinsics (no checkerboard calibration), and depth gives the hand's 3D position directly. |
+| Calibration | ArUco marker taped to the table | Gives a shared "table frame" for real and sim. Printer scales to 89%: marker is 89 mm, board squares 26.7 mm (set in `calibration/make_targets.py`). |
 | Hand tracking | MediaPipe Hands (fast, works live) | HaMeR only if needed offline for better quality. |
 | Point tracking | CoTracker (offline) | For clean action flow in the dataset. |
 | Flow format | Points × timesteps × (x, y, z, visible), in table coordinates | Same format everywhere. Defined in Phase 3. |
@@ -37,7 +37,7 @@ At the end: **real photo + instruction → flow → robot does the task in sim.*
 project/
 ├── PROJECT_PLAN.md        ← this file
 ├── README.md              ← final write-up for reviewers
-├── calibration/           ← ArUco marker, camera calibration scripts
+├── calibration/           ← printable targets, D405 camera access, table-marker pose
 ├── sim/                   ← sim scene setup, robot control helpers
 ├── replay/                ← Phase 1: offline video → sim replay
 ├── teleop/                ← Phase 2: live hand → sim teleop
@@ -60,7 +60,7 @@ project/
 ### Steps
 
 1. **Set up the sim scene.** Panda arm, table, cup, plate. Make sure I can move the gripper to a target position and open/close it.
-2. **Print and place the ArUco marker** on the table. Calibrate my phone camera once (checkerboard photos).
+2. **Print and place the ArUco marker** on the table. Check the D405 factory calibration against the ChArUco board and the depth sensor.
 3. **Record one short demo** (5–10 seconds) of picking up the cup and putting it on the plate, with the marker visible.
 4. **Track my hand** in every frame with MediaPipe. Get wrist and fingertip positions.
 5. **Convert to table coordinates** using the marker, so positions are in centimetres on the table, not pixels.
@@ -78,7 +78,7 @@ project/
 
 ### Watch out for
 
-- Depth (distance from camera) from a single phone camera is noisy. The marker helps; keep the camera angle steady.
+- D405 depth is most accurate within 50 cm and has holes on blank white surfaces (no texture to match). The marker sits about 52 cm away.
 - If the replayed grasp misses the rim, check the offset between my wrist and where my fingers actually closed on the cup.
 
 ---
@@ -89,7 +89,7 @@ project/
 
 ### Steps
 
-1. **Stream the phone camera** to my laptop (an IP webcam app or similar).
+1. **Stream the D405** (USB 3) to the sim loop.
 2. **Run the Phase 1 pipeline live:** marker → hand tracking → table coordinates → robot target, every frame.
 3. **Smooth the motion** so the robot doesn't jitter (a simple filter; keep lag low).
 4. **Run the sim loop at 20 Hz**, always using the latest hand position.
@@ -152,7 +152,7 @@ project/
 | Item | Source |
 |---|---|
 | Instruction | Typed or spoken ("put the cup on the plate") |
-| Real video | Phone camera |
+| Real video | D405 colour + depth |
 | Hand action flow | Phase 3 pipeline on the real video |
 | Cup flow | Phase 3 pipeline on the real video |
 | Sim robot actions | Teleop, recorded every step |
