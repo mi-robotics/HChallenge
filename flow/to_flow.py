@@ -3,9 +3,12 @@
   python flow/to_flow.py [data/demos/<demo> ...]     (default: all demos)
 
 Hand: tracked pixel + D405 depth at that pixel (median of a 7x7 patch), then the marker pose, as in step 1.5.
-Mug: tracked pixel + the stand-in mug point's depth (flow/format.py, moved with the CoTracker pinch point; the D405
-has no depth on the white mug), so the mug's image position comes from tracking and only its distance from the camera
-from the hand. (Depth from PnP on the tracked mug points drifts during the carry: flow/mug_check.py.)
+Mug: tracked pixel (points from the SAM 2 mask, flow/track_points.py) + depth where the pixel's camera ray meets the
+stand-in mug, a 4 cm-radius vertical cylinder that moves with the CoTracker pinch point (flow/format.py cup_cylinder;
+the D405 has no depth on the white mug). Rays that miss the cylinder (e.g. on the handle) take the point of closest
+approach to its axis; rays that would meet it above the rim (mask points inside the mug, seen through the opening)
+take the point where they cross the rim plane. So the mug's image position comes from tracking and only its distance from the camera from the
+hand. (Depth from PnP on the tracked mug points drifts during the carry: flow/mug_check.py.)
 Then sampled at 10 Hz: each step is the mean of the visible camera frames within +-50 ms (about 3 frames; taking
 only the nearest frame left about twice the frame-to-frame jitter of the smoothed step 1.6 path). visible = the step
 3.2 occlusion check (any visible frame in the window). Hidden hand points: linear interpolation. Hidden mug points
@@ -22,12 +25,13 @@ import json
 import sys
 from pathlib import Path
 
+import cv2
 import numpy as np
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "flow"))
 sys.path.insert(0, str(ROOT / "replay"))
-from format import DTYPE, HAND_POINTS, HZ, N_CUP_POINTS, check, cup_from_hand, fill_hidden  # noqa: E402
+from format import CUP_R_M, DTYPE, HAND_POINTS, HZ, N_CUP_POINTS, check, cup_cylinder, fill_hidden  # noqa: E402
 from to_table import demo_marker_pose, pixels_to_table  # noqa: E402
 from track_hand import depth_at, depth_frames  # noqa: E402
 
@@ -60,10 +64,22 @@ def tracked_hand(demo):
 
 
 def tracked_mug(demo, t_cam, hand, K, dist, R, tv, ct):
-    """Mug points [T, 8, 3] in the table frame: tracked pixel + the stand-in point's depth."""
-    standin = cup_from_hand(demo, t_cam, hand)[:, :, :3]  # [8, T, 3]
-    z_cam = (standin.transpose(1, 0, 2) @ R.T + np.ravel(tv))[..., 2]  # [T, 8]
-    return pixels_to_table(ct["cup_uv"].reshape(-1, 2), z_cam.ravel(), K, dist, R, tv).reshape(len(t_cam), -1, 3)
+    """Mug points [T, 8, 3] in the table frame: tracked pixel's camera ray meets the stand-in cylinder (front side)."""
+    axis, rim, _, _ = cup_cylinder(demo, t_cam, hand)  # [T, 2], [T]
+    o = -R.T @ np.ravel(tv)  # camera centre, table frame
+    T_, P = ct["cup_uv"].shape[:2]
+    xy = cv2.undistortPoints(ct["cup_uv"].reshape(-1, 1, 2).astype(np.float64), K, dist).reshape(T_, P, 2)
+    d = np.concatenate([xy, np.ones((T_, P, 1))], -1) @ R  # ray directions R^T [x, y, 1], table frame
+    # |o_xy + s d_xy - axis|^2 = r^2 -> a s^2 + 2 b s + c = 0; nearer root = camera-facing side.
+    w = o[:2] - axis[:, None]  # [T, 1->P, 2]
+    a = (d[..., :2] ** 2).sum(-1)
+    b = (w * d[..., :2]).sum(-1)
+    c = (w ** 2).sum(-1) - CUP_R_M ** 2
+    disc = b ** 2 - a * c
+    s = np.where(disc >= 0, (-b - np.sqrt(np.maximum(disc, 0))) / a, -b / a)  # miss: closest approach to the axis
+    above = o[2] + s * d[..., 2] > rim[:, None]
+    s = np.where(above, (rim[:, None] - o[2]) / d[..., 2], s)  # inside the mug: on the rim plane
+    return o + s[..., None] * d
 
 
 def fill_rigid(p, v):

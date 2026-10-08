@@ -44,10 +44,10 @@ img.result { display: block; width: 100%; max-width: 100%; border-radius: 6px; b
 
   <figure>
     <img class="result" src="media/phase3/task4/mug_check.png" alt="Five rows, one per demo: mug height above the table over time. Blue: the flow (tracked pixels, depth from the hand). Orange: PnP from the tracked mug points alone. They agree while the mug stands still; while it is carried (shaded) PnP drifts by up to 10 cm and jumps back at the release.">
-    <figcaption>Mug standing still: PnP and flow agree within a median 3–10 mm. Carried (shaded): PnP drifts along the camera's line of sight and jumps back at release, so the flow keeps the hand-derived depth.</figcaption>
+    <figcaption>Now with the mask points (below). Mug standing still: PnP and flow agree within a median 2–12 mm. Carried (shaded): PnP drifts by up to 11 cm along the camera's line of sight, so the flow keeps the hand-derived depth.</figcaption>
   </figure>
 
-  <h2>Choosing the mug points: from the hand vs from a mask</h2>
+  <h2>Choosing the mug points: from the hand vs from a mask (now used)</h2>
   <p>Geometric (current): 8 points on a 4 cm-radius cylinder placed from the grasp. Mask (new): SAM 2 segments the mug in every frame from one click; 8 points are spread over the first-frame mask. Both tracked by CoTracker from the first frame, scored against the SAM 2 mask in every frame.</p>
   <figure>
     <video src="media/phase3/task4/mug_points.mp4" controls muted loop playsinline aria-label="Each demo shown twice side by side: left, the geometric mug points; right, the mask-based points; the SAM 2 mug outline in white. In demo 4 one geometric point starts on the mug's lower edge and stays on the table."></video>
@@ -69,7 +69,7 @@ img.result { display: block; width: 100%; max-width: 100%; border-radius: 6px; b
   <p style="font: 13px/1.5 var(--mono); color: var(--muted)">"on mug" and "&gt; 20 px off" are shares of the point-frames CoTracker calls visible (geometric 95–100% visible, mask 88–91%: mask points near the edges and handle are hidden more as the mug turns).</p>
 
   <ul class="files">
-    <li><a href="https://github.com/mi-robotics/HumanoidsChallenge/blob/main/flow/to_flow.py" target="_blank" rel="noopener">flow/to_flow.py</a><span>Mug flow: tracked pixel + hand-derived depth; hidden mug points move with the visible ones</span></li>
+    <li><a href="https://github.com/mi-robotics/HumanoidsChallenge/blob/main/flow/to_flow.py" target="_blank" rel="noopener">flow/to_flow.py</a><span>Mug flow: tracked pixel + depth where its ray meets the hand-derived cylinder; hidden mug points move with the visible ones</span></li>
     <li><a href="https://github.com/mi-robotics/HumanoidsChallenge/blob/main/flow/mug_sam.py" target="_blank" rel="noopener">flow/mug_sam.py</a><span>SAM 2 mug masks for every frame from one click</span></li>
     <li><a href="https://github.com/mi-robotics/HumanoidsChallenge/blob/main/flow/mug_compare.py" target="_blank" rel="noopener">flow/mug_compare.py</a><span>Geometric vs mask points, scored against the masks; writes the video and table</span></li>
     <li><a href="https://github.com/mi-robotics/HumanoidsChallenge/blob/main/flow/mug_check.py" target="_blank" rel="noopener">flow/mug_check.py</a><span>PnP check and this plot</span></li>

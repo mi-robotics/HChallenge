@@ -5,8 +5,7 @@
   geometric  (current) points on a cylinder placed from the hand: centre 4 cm from the grasp point along
              thumb -> index, two rings of 4 on the camera-facing half (flow/format.py). Needs the grasp and an
              assumed mug size.
-  mask       (new) 8 points spread over the SAM 2 mug mask in the first frame (eroded by ERODE_PX, farthest-point
-             sampling from the mask's centre). Needs one click on the mug.
+  mask       (new) 8 points spread over the SAM 2 mug mask in the first frame (flow/mug_sam.py mask_points). Needs one click on the mug.
 
 Both are tracked by CoTracker from the first frame only (same settings), so the comparison is about where the points
 start, not the re-query at the last frame that flow/track_points.py also uses.
@@ -29,31 +28,18 @@ sys.path.insert(0, str(ROOT / "flow"))
 sys.path.insert(0, str(ROOT / "replay"))
 from cotracker.predictor import CoTrackerPredictor  # noqa: E402
 from format import cup_from_hand  # noqa: E402
-from mug_sam import load_masks  # noqa: E402
+from mug_sam import load_masks, mask_points  # noqa: E402
 from to_flow import tracked_hand  # noqa: E402
 from track_points import CHECKPOINT, RED, YELLOW, read_video, run_cotracker  # noqa: E402
 
 MEDIA = ROOT / "media" / "phase3" / "task4"
-ERODE_PX, TOL_PX, FAR_PX, N = 8, 4, 20, 8
+TOL_PX, FAR_PX, N = 4, 20, 8
 
 
 def geometric_points(demo):
     t, hand, _, _, (K, dist, R, tv, _) = tracked_hand(demo)
     p = cup_from_hand(demo, t, hand)[:, 0, :3]
     return cv2.projectPoints(p.astype(np.float64), cv2.Rodrigues(R)[0], np.ravel(tv), K, dist)[0][:, 0]
-
-
-def mask_points(mask):
-    """N points spread over the eroded mask: farthest-point sampling, starting nearest the mask's centre."""
-    m = cv2.erode(mask.astype(np.uint8), np.ones((2 * ERODE_PX + 1,) * 2, np.uint8))
-    vu = np.argwhere(m)
-    pts = vu[:, ::-1].astype(float)  # (u, v)
-    chosen = [np.linalg.norm(pts - pts.mean(0), axis=1).argmin()]
-    d = np.linalg.norm(pts - pts[chosen[0]], axis=1)
-    for _ in range(N - 1):
-        chosen.append(d.argmax())
-        d = np.minimum(d, np.linalg.norm(pts - pts[chosen[-1]], axis=1))
-    return pts[chosen]
 
 
 def score(uv, vis, masks):

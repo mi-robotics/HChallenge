@@ -8,9 +8,9 @@ comes from its query nearest in time. (With one query frame per demo, the pinky 
 70-80% of frames in demos 2 and 4, drifted up to 287 px.)
 Check: pixel distance to the MediaPipe landmark in frames >= 4 from a query frame where MediaPipe found the hand.
 
-Mug: the 8 stand-in mug points (flow/format.py, camera-facing half of the mug) projected into the first frame and
-into the last frame (mug back on the saucer). Frames up to the release use the first-frame queries, later frames the
-last-frame ones.
+Mug: 8 points spread over the SAM 2 mug mask in the first frame (flow/mug_sam.py, run it first), tracked from there.
+(Before: 8 points on a cylinder placed from the hand, re-queried in the last frame; in demo 4 one started on the
+mug's lower edge and stayed on the table. Comparison: flow/mug_compare.py.)
 
 Occlusion. CoTracker's visibility says whether the surface at the tracked pixel is visible, not whether the point is:
 a query on a hidden pinky knuckle starts on whatever is in front of it. So a point is also occluded if the D405 depth
@@ -23,10 +23,8 @@ at its pixel disagrees with where the point should be:
         the border check only.
         (Using MediaPipe's z directly, without the fit, gave per-landmark biases of -6 to +5 cm: the wrist was
         "occluded" in 92-100% of frames.)
-  mug   expected depth = the stand-in mug point's depth. The white mug itself has no D405 depth, so a valid depth
-        > IN_FRONT_M in front means the hand is in front, and > BEHIND_M behind means the track slid off the mug
-        onto the table (seen in demo 4). Also occluded if the track is > FAR_PX from the stand-in point's projection
-        (the stand-in comes from the hand; mug tracks are normally within a median 1-6 px of it).
+  mug   hidden unless CoTracker calls it visible and it lies inside that frame's SAM 2 mug mask (dilated by
+        MASK_TOL_PX): the mask leaves out the hand in front of the mug and anything off the mug.
 
 Writes cotracker.npz to each demo folder (uv [T, 6, 2], visible [T, 6], cup_uv [T, 8, 2], cup_visible [T, 8];
 visible = not occluded) and media/phase3/task2/tracks.mp4 (all demos tiled, with a legend).
@@ -43,8 +41,8 @@ import torch
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "flow"))
 sys.path.insert(0, str(ROOT / "replay"))
-from format import HAND_MEDIAPIPE, HAND_POINTS, cup_from_hand, from_mediapipe  # noqa: E402
-from to_table import demo_marker_pose  # noqa: E402
+from format import HAND_MEDIAPIPE, HAND_POINTS  # noqa: E402
+from mug_sam import load_masks, mask_points  # noqa: E402
 from track_hand import depth_at, depth_frames  # noqa: E402
 from cotracker.predictor import CoTrackerPredictor  # noqa: E402
 
@@ -53,7 +51,7 @@ MEDIA = ROOT / "media" / "phase3" / "task2"
 QUERY_EVERY = 15  # frames (0.5 s)
 IN_FRONT_M, BEHIND_M = 0.03, 0.05
 FIT_INLIER_M = 0.015
-FAR_PX = 40
+MASK_TOL_PX = 4
 EDGE_PX = 10
 # BGR of dataviz slots 1-4: back of hand (wrist + knuckles), thumb tip, index tip, mug; red = occluded
 BLUE, ORANGE, GREEN, YELLOW, RED = (214, 120, 42), (52, 104, 235), (122, 175, 27), (0, 161, 237), (40, 40, 220)
@@ -109,7 +107,7 @@ def track(demo, model):
     demo = Path(demo)
     meta = json.loads((demo / "meta.json").read_text())
     K, dist = np.array(meta["camera_matrix"]), np.array(meta["dist_coeffs"])
-    hand, rt = np.load(demo / "hand.npz"), np.load(demo / "retarget.npz")
+    hand = np.load(demo / "hand.npz")
     frames = read_video(demo / "color.mp4")
     n = len(frames)
     idx = np.arange(n)
@@ -121,27 +119,19 @@ def track(demo, model):
     src = np.abs(idx[:, None] - qf[None]).argmin(1)  # nearest query per frame
     uv, co_vis = tracks[idx, src], vis[idx, src]
 
-    # Mug: stand-in points at every camera frame, queried in the first and last frame.
-    t_cam, hand30, _ = from_mediapipe(demo, hz=None)
-    cup3d = cup_from_hand(demo, t_cam, hand30)[:, :n, :3]  # [8, T, 3] table frame
-    R, tv, _ = demo_marker_pose(demo, K, dist)
-    cam = cup3d.transpose(1, 0, 2) @ R.T + np.ravel(tv)  # [T, 8, 3] camera frame
-    cup_q = np.stack([cv2.projectPoints(cup3d[:, f].astype(np.float64), cv2.Rodrigues(R)[0], tv, K, dist)[0][:, 0]
-                      for f in (0, n - 1)])
-    ctracks, cvis = run_cotracker(model, frames, np.array([0, n - 1]), cup_q)
-    i_release = int(np.abs(t_cam - rt["t"][int(rt["i_release"])]).argmin())
-    csrc = (idx > i_release).astype(int)
-    cup_uv, cup_co_vis = ctracks[idx, csrc], cvis[idx, csrc]
+    # Mug: points from the first-frame SAM 2 mask.
+    masks = load_masks(demo)[:n]
+    ctracks, cvis = run_cotracker(model, frames, np.array([0]), mask_points(masks[0])[None])
+    cup_uv, cup_co_vis = ctracks[:, 0], cvis[:, 0]
 
     # Occlusion from D405 depth at the tracked pixels.
     scale = meta["depth_scale"]
-    d_hand, d_cup = np.zeros((n, len(HAND_POINTS))), np.zeros((n, cup_uv.shape[1]))
+    d_hand = np.zeros((n, len(HAND_POINTS)))
     for i, d_raw in enumerate(depth_frames(demo / "depth.mkv", tuple(meta["image_size"]))):
         if i >= n:
             break
         d_m = d_raw.astype(np.float32) * scale
         d_hand[i] = [depth_at(d_m, p) for p in uv[i]]
-        d_cup[i] = [depth_at(d_m, p) for p in cup_uv[i]]
     rng = np.random.default_rng(0)
     expected = np.full((n, len(HAND_POINTS)), np.nan)
     for i in range(n):
@@ -157,10 +147,11 @@ def track(demo, model):
     h, w = frames.shape[1:3]
     at_edge = (uv[..., 0] < EDGE_PX) | (uv[..., 0] > w - 1 - EDGE_PX) | (uv[..., 1] < EDGE_PX) | (uv[..., 1] > h - 1 - EDGE_PX)
     visible = co_vis & ~in_front & ~off_hand & ~no_depth & ~at_edge
-    cup_in_front = (d_cup > 0) & (d_cup < cam[..., 2] - IN_FRONT_M)
-    cup_off = d_cup > cam[..., 2] + BEHIND_M
-    cup_far = np.linalg.norm(cup_uv - project(cup3d, R, tv, K, dist), axis=2) > FAR_PX
-    cup_visible = cup_co_vis & ~cup_in_front & ~cup_off & ~cup_far
+    tol = np.stack([cv2.dilate(m.astype(np.uint8), np.ones((2 * MASK_TOL_PX + 1,) * 2, np.uint8)) for m in masks]) > 0
+    cu = np.clip(cup_uv[..., 0].round().astype(int), 0, w - 1)
+    cv = np.clip(cup_uv[..., 1].round().astype(int), 0, h - 1)
+    on_mug = tol[idx[:, None], cv, cu]
+    cup_visible = cup_co_vis & on_mug
     np.savez(demo / "cotracker.npz", uv=uv, visible=visible, cup_uv=cup_uv, cup_visible=cup_visible)
 
     # Check against MediaPipe away from the query frames (at a query frame the two agree by construction).
@@ -173,17 +164,9 @@ def track(demo, model):
         f"{p} {(~v).mean() * 100:.0f} (CoTracker {(~c).mean() * 100:.0f}, in front {f.mean() * 100:.0f}, off hand "
         f"{o.mean() * 100:.0f}, no depth {z.mean() * 100:.0f}, edge {e.mean() * 100:.0f})"
         for p, v, c, f, o, z, e in zip(HAND_POINTS, visible.T, co_vis.T, in_front.T, off_hand.T, no_depth.T, at_edge.T)))
-    print(f"   mug: occluded {(~cup_visible).mean() * 100:.0f}% (CoTracker {(~cup_co_vis).mean() * 100:.0f}, hand in "
-          f"front {cup_in_front.mean() * 100:.0f}, off mug {cup_off.mean() * 100:.0f}, far from stand-in {cup_far.mean() * 100:.0f}); px from the stand-in mug points median "
-          f"{np.median(np.linalg.norm(cup_uv - project(cup3d, R, tv, K, dist), axis=2)):.0f}")
+    print(f"   mug: occluded {(~cup_visible).mean() * 100:.0f}% (CoTracker {(~cup_co_vis).mean() * 100:.0f}, outside "
+          f"the mask {(~on_mug).mean() * 100:.0f})")
     return frames, uv, visible, cup_uv, cup_visible, mp, hand["detected"], qf
-
-
-def project(p3d, R, tv, K, dist):
-    """[P, T, 3] table frame -> [T, P, 2] pixels."""
-    P, T_ = p3d.shape[:2]
-    uv = cv2.projectPoints(p3d.reshape(-1, 3).astype(np.float64), cv2.Rodrigues(R)[0], tv, K, dist)[0]
-    return uv.reshape(P, T_, 2).transpose(1, 0, 2)
 
 
 def overlay(demo, frames, uv, visible, cup_uv, cup_visible, mp, detected, q):

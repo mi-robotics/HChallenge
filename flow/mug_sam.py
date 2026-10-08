@@ -2,11 +2,13 @@
 
   python flow/mug_sam.py [data/demos/<demo> ...]     (default: all demos)
 
-The click is the hand-derived mug centre (flow/format.py stand-in) projected into the first frame: a stand-in for a
-human click; the mask itself comes from the image only.
+The click is the hand-derived mug centre (flow/format.py stand-in, from the MediaPipe hand) projected into the first
+frame: a stand-in for a human click; the mask itself comes from the image only. mask_points() picks the 8 mug points
+to track (flow/track_points.py) from the first-frame mask. Run this before flow/track_points.py.
 
 Writes mug_mask.npz to each demo folder (packed boolean masks [T, H, W]).
 """
+import json
 import shutil
 import sys
 from pathlib import Path
@@ -19,22 +21,26 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "flow"))
 sys.path.insert(0, str(ROOT / "replay"))
 from sam2.build_sam import build_sam2_video_predictor  # noqa: E402
-from to_flow import tracked_hand  # noqa: E402
-from format import cup_from_hand  # noqa: E402
-from track_points import read_video  # noqa: E402
+from format import N_CUP_POINTS, cup_from_hand, from_mediapipe  # noqa: E402
+from to_table import demo_marker_pose  # noqa: E402
 
 CHECKPOINT = ROOT / "third_party" / "sam2_ckpt" / "sam2.1_hiera_large.pt"
 CONFIG = "configs/sam2.1/sam2.1_hiera_l.yaml"
+ERODE_PX = 8
 
 
 def click(demo):
     """Projected centre of the stand-in mug in the first frame."""
-    t, hand, _, _, (K, dist, R, tv, _) = tracked_hand(demo)
-    c = cup_from_hand(demo, t, hand)[:, 0, :3].mean(0)
+    meta = json.loads((Path(demo) / "meta.json").read_text())
+    K, dist = np.array(meta["camera_matrix"]), np.array(meta["dist_coeffs"])
+    R, tv, _ = demo_marker_pose(Path(demo), K, dist)
+    t, hand, _ = from_mediapipe(Path(demo), hz=None)
+    c = cup_from_hand(Path(demo), t, hand)[:, 0, :3].mean(0)
     return cv2.projectPoints(c[None].astype(np.float64), cv2.Rodrigues(R)[0], np.ravel(tv), K, dist)[0].ravel()
 
 
 def segment(demo, predictor):
+    from track_points import read_video
     demo = Path(demo)
     frames = read_video(demo / "color.mp4")
     tmp = demo / "_frames_jpg"
@@ -55,6 +61,18 @@ def segment(demo, predictor):
     print(f"{demo.name}: click {xy.round()} | mask area first frame {area[0]} px, median {np.median(area):.0f}, "
           f"min {area.min()} px, empty in {(area == 0).sum()} frames")
     return masks
+
+
+def mask_points(mask, n=N_CUP_POINTS):
+    """n points spread over the eroded mask: farthest-point sampling, starting nearest the mask's centre."""
+    m = cv2.erode(mask.astype(np.uint8), np.ones((2 * ERODE_PX + 1,) * 2, np.uint8))
+    pts = np.argwhere(m)[:, ::-1].astype(float)  # (u, v)
+    chosen = [np.linalg.norm(pts - pts.mean(0), axis=1).argmin()]
+    d = np.linalg.norm(pts - pts[chosen[0]], axis=1)
+    for _ in range(n - 1):
+        chosen.append(d.argmax())
+        d = np.minimum(d, np.linalg.norm(pts - pts[chosen[-1]], axis=1))
+    return pts[chosen]
 
 
 def load_masks(demo):

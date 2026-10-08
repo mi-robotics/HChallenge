@@ -60,8 +60,10 @@ def from_mediapipe(demo, hz=HZ):
     return t.astype(DTYPE), flow, frame
 
 
-def cup_from_hand(demo, t, hand):
-    """Stand-in cup flow [8, N, 4] (see module docstring)."""
+def cup_cylinder(demo, t, hand):
+    """The stand-in mug as a vertical cylinder (radius CUP_R_M): axis xy [N, 2] and rim height [N] per step, plus
+    (g, c) = grasp point and axis xy at the grasp. Still until the grasp, moves with the pinch point until the
+    release, then stays (see module docstring)."""
     rt = np.load(demo / "retarget.npz")
     i_grasp = int(np.abs(t - rt["t"][int(rt["i_grasp"])]).argmin())
     i_release = int(np.abs(t - rt["t"][int(rt["i_release"])]).argmin())
@@ -69,6 +71,17 @@ def cup_from_hand(demo, t, hand):
     g = (thumb + index) / 2
     u = (index - thumb)[:2] / np.linalg.norm((index - thumb)[:2])
     c = g[:2] + CUP_R_M * u
+    pinch = (hand[1, :, :3] + hand[2, :, :3]) / 2
+    shift = pinch[np.clip(np.arange(len(t)), i_grasp, i_release)] - g  # [N, 3]
+    return c + shift[:, :2], g[2] + shift[:, 2], g, c
+
+
+def cup_from_hand(demo, t, hand):
+    """Stand-in cup flow [8, N, 4] (see module docstring)."""
+    _, _, g, c = cup_cylinder(demo, t, hand)
+    rt = np.load(demo / "retarget.npz")
+    i_grasp = int(np.abs(t - rt["t"][int(rt["i_grasp"])]).argmin())
+    i_release = int(np.abs(t - rt["t"][int(rt["i_release"])]).argmin())
     to_cam = np.load(demo / "hand_table.npz")["cam_in_table"][:2] - c
     a = np.arctan2(to_cam[1], to_cam[0]) + np.radians([-60, -20, 20, 60])  # camera-facing half
     ring = np.c_[c[0] + CUP_R_M * np.cos(a), c[1] + CUP_R_M * np.sin(a)]
