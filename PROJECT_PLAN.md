@@ -6,7 +6,7 @@ Humanoid Robot Learning Internship Challenge
 
 ## The idea in one paragraph
 
-I record myself doing a simple task with my hand (picking up a cup and putting it on a plate) while my hand **teleoperates a robot in simulation** at the same time. That gives me paired data: real video, my hand's motion as **action flow** (trails of tracked points), and the robot's actions in sim. I then train two models:
+I record myself doing a simple task with my hand (picking up a cup and putting it on a plate), then **replay each recording on a robot in simulation** and keep the episodes where the sim robot succeeds. That gives me paired data: real video, my hand's motion as **action flow** (trails of tracked points), and the robot's actions in sim. I then train two models:
 
 1. **Flow generator**: looks at a real photo + instruction and predicts the hand's action flow ("how should a hand move to do this?").
 2. **Flow-to-action policy**: takes that flow and turns it into robot actions in sim ("how does the robot make that motion happen?").
@@ -26,7 +26,8 @@ At the end: **real photo + instruction → flow → robot does the task in sim.*
 | Hand tracking | MediaPipe Hands (fast, works live) | HaMeR only if needed offline for better quality. |
 | Point tracking | CoTracker (offline) | For clean action flow in the dataset. |
 | Flow format | Points × timesteps × (x, y, z, visible), in table coordinates | Same format everywhere. Defined in Phase 3. |
-| Compute | Laptop for sim + teleop, Google Colab GPU for training | |
+| Sim actions for the dataset | Offline replay of recorded videos; failed replays dropped | Changed after step 1.9: replay with rim-grasp constraints succeeded 5/5, so live teleop (Phase 2) was dropped. |
+| Compute | Laptop for recording + sim replay, Google Colab GPU for training | |
 | Deadline | ___ | |
 
 ---
@@ -40,7 +41,6 @@ project/
 ├── calibration/           ← printable targets, D405 camera access, table-marker pose
 ├── sim/                   ← sim scene setup, robot control helpers
 ├── replay/                ← Phase 1: offline video → sim replay
-├── teleop/                ← Phase 2: live hand → sim teleop
 ├── flow/                  ← Phase 3: video → action flow
 ├── data/                  ← Phase 4: recorded episodes (not committed if large)
 ├── policy/                ← Phase 5: flow → action policy
@@ -89,6 +89,7 @@ project/
 - **1.7** Changed the mapping from wrist → gripper to **pinch point (thumb/index midpoint) → gripper fingertip centre**: it is where the fingers touch the mug, while the wrist sits 10+ cm above it at a pose-dependent offset. Target = pinch − pinch at grasp + sim rim-grasp point, so the real (~9 cm) and sim (13.5 cm) mug heights cancel; no rotation or scale. Gripper: one grasp per demo; close at the first thumb–index < 2.5 cm, release at the first > 3.0 cm after a 3 cm lift. A plain hysteresis gave extra events (relaxed hand re-closing after release, a 0.35 s flicker in demo 4, demo 4 releasing by moving away with fingers only at ~3.3 cm); debouncing broke demos 2–3. Check: all 5 release points land within std 0.2 / 0.4 / 0.6 cm (x/y/z) of each other, i.e. on the saucer, which did not move; grasp heights 6.9–8.5 cm (just under a ~9 cm mug's rim); lift 7–15 cm.
 - **1.8** Depth-based cup/saucer detection failed: both are white and the D405 returns almost no depth on blank white surfaces (the "saucer" it found was a cable). Located them from the hand instead: grasp point = on the cup, release point = over the saucer. Projected into the first frame, the grasp point lands on the mug rim and the release xy (at saucer height) on the saucer centre in all 5 demos. Sim: cup at the BDDL region centre (−0.11, 0), plate at cup + (release − grasp)xy (15–38 cm away). All replay targets within 0.43–0.78 m of the robot base (Panda reach 0.855 m) and ≥ 9 cm above the table. Added a sim camera at the D405's pose relative to the cup (same orientation, fovy 58.6°) for side-by-side videos; needed `sim.forward()` after moving it.
 - **1.9** `replay/replay.py`: matched scene, one control step per 20 Hz sample, LIBERO On(cup, plate) after 1 s of settling. **Raw hand path: 2/5.** Failures were all the embodiment gap (I pinch from the side; the robot grasps with one finger inside the mug): the gripper knocked the mug over on approach (demo 3), dragged it off the plate when moving away sideways after release (demo 2), and closed while still descending (demo 5). **With three local rim-grasp constraints: 5/5**, cups end 0.1–1.8 cm from the plate centre, sim cup lift 6.7–13.8 cm vs hand 7.2–15.3 cm. Constraints: (1) approach from ≥ 8 cm above the grasp point until the *gripper* (not the target, the arm lags fast motion by up to 10 cm) is within 3 cm horizontally; (2) at the grasp, 0.5 s arrive with fingers open, then 0.5 s close; (3) after release, hold 0.25 s and rise 10 cm before following the hand. A first version that applied the clearance to the target and closed during the settle got 3/5. Tracking error (gripper vs target) median 8–34 mm, p95 30–91 mm: the OSC controller lags fast hand motion (up to 0.43 m/s).
+- **1.9 ablation** (`replay/ablation.py`, all 8 subsets × 5 demos): none 2/5; approach / settle / lift alone 3/5 each; approach+settle 4/5, approach+lift 4/5, settle+lift 3/5; all three 5/5. Each constraint is needed: without approach demo 3 is knocked over (gripper comes in 2–3 cm above grasp height, pushes the mug 4 cm before the fingers close); without settle demo 5 closes on air (fingers close 3.2 cm above the grasp point, cup lifted 0.5 cm); without lift-out demo 2 is dragged 3.8 cm off the plate centre. Approach alone breaks demo 5's grasp (the gripper arrives later than the hand's close command), which settle fixes. Parameters were tuned on these same 5 demos.
 
 ### Watch out for
 
@@ -97,32 +98,9 @@ project/
 
 ---
 
-## Phase 2: Video → Sim Teleop (live)
+## Phase 2: Video → Sim Teleop (live) — dropped
 
-**Goal:** Move my hand in front of the camera and have the sim robot follow in real time.
-
-### Steps
-
-1. **Stream the D405** (USB 3) to the sim loop.
-2. **Run the Phase 1 pipeline live:** marker → hand tracking → table coordinates → robot target, every frame.
-3. **Smooth the motion** so the robot doesn't jitter (a simple filter; keep lag low).
-4. **Run the sim loop at 20 Hz**, always using the latest hand position.
-5. **Show the sim on screen** next to the camera feed so I can watch the robot while moving my hand.
-6. **Measure latency** (time from hand movement to robot movement). Note it in the README.
-7. **Add a recording button / hotkey** that saves everything for one episode (used in Phase 4).
-8. **Add a reset**: puts the sim cup back where the real cup is.
-
-### Done when
-
-- [ ] Robot follows my hand live with acceptable lag (aim for under ~200 ms)
-- [ ] I can put the sim cup on the sim plate by moving my hand
-- [ ] Recording saves an episode to disk
-- [ ] Short screen recording of live teleop for the README
-
-### Watch out for
-
-- If the camera moves (head mount), the marker must stay visible so the table frame can be recomputed every frame.
-- Too much smoothing = laggy robot; too little = shaky robot. Tune it once and write down the setting.
+Dropped after step 1.9. Offline replay of a recorded video already gets the sim cup onto the plate (5/5 with the rim-grasp constraints), so the dataset's sim actions come from replaying recorded videos (Phase 4), and failed replays are dropped. Live teleop would have let me correct the robot while recording; offline replay can't, so some episodes will be lost to failed replays instead.
 
 ---
 
@@ -159,40 +137,41 @@ project/
 
 ## Phase 4: Data Collection
 
-**Goal:** Record a paired dataset using the Phase 2 teleop setup.
+**Goal:** Record a paired dataset: real videos, replayed offline in sim with the Phase 1 pipeline. Keep the episodes where the sim cup ends on the plate.
 
 ### What one episode contains
 
 | Item | Source |
 |---|---|
-| Instruction | Typed or spoken ("put the cup on the plate") |
-| Real video | D405 colour + depth |
+| Instruction | "put the cup on the plate" (optional variations) |
+| Real video | D405 colour + depth (`replay/record.py`) |
 | Hand action flow | Phase 3 pipeline on the real video |
 | Cup flow | Phase 3 pipeline on the real video |
-| Sim robot actions | Teleop, recorded every step |
-| Sim images + robot state | Sim, recorded every step |
-| Success flags | Did the real cup reach the plate? Did the sim cup? |
+| Sim robot actions | Offline replay (`replay/replay.py`, rim-grasp constraints), every step |
+| Sim images + robot state | Sim, recorded every step of the replay |
+| Success flag | LIBERO On(cup, plate) after the replay |
 
-### Protocol
+### Steps
 
-1. Place the cup and plate in a new position each episode (mark a rough grid of positions on the table).
-2. Press reset so the sim matches the real scene.
-3. Press record, move the **real** cup to the plate with my hand while watching the **sim** robot follow.
-4. Stop recording. Note whether both real and sim succeeded.
-5. Repeat. Target **50–100 episodes**. Optional: a few instruction variations ("put the cup on the plate", "move the cup to the left").
+1. **Record episodes** with `replay/record.py`. Place the cup and plate in a new position each time (mark a rough grid on the table). Target **50–100 episodes**.
+2. **Run the Phase 1 pipeline** on every episode: track hand → table coordinates → clean → retarget → match scene.
+3. **Replay each episode in sim** with the rim-grasp constraints, saving actions, robot state and images per step.
+4. **Keep the successful replays.** Write down how many were dropped and why (missed grasp, hand lost, etc.).
+5. **Extract hand and cup flow** (Phase 3) for the kept episodes.
+6. **Split by episode** into train / validation / test, with some cup positions **only in the test set**. Write `data/README.md`: how many episodes, how many kept, what was dropped and why.
 
-### After recording
+### Done when
 
-- [ ] Run the Phase 3 flow extraction on all episodes
-- [ ] Drop episodes where real and sim drifted apart (e.g. sim cup missed)
-- [ ] Split by episode: train / validation / test
-- [ ] Keep some cup starting positions **only in the test set** (to test generalisation)
-- [ ] Write `data/README.md`: how many episodes, how many kept, what was dropped and why
+- [ ] 50–100 recorded episodes, each replayed in sim
+- [ ] Kept episodes have sim actions, state, images and flow saved in one format
+- [ ] `data/README.md` with counts and the split
 
 ### Watch out for
 
 - Vary lighting and positions a bit; too-similar episodes make models look better than they are.
 - Back up the raw videos; everything else can be regenerated from them.
+- `scene_match.py` puts the sim cup at one fixed spot and only the cup → plate offset follows the real scene. If varied absolute positions matter for Phase 5, place the sim cup at the real cup's table position instead.
+- Keeping only successful replays filters on the hand-designed constraints too; report the kept fraction.
 
 ---
 
@@ -224,7 +203,7 @@ project/
 
 ### Comparisons (these make the results meaningful)
 
-- [ ] **Baseline:** raw hand-coded retargeting (Phase 1 rule) on the same flows
+- [ ] **Baseline:** hand-coded retargeting (Phase 1 rule + rim-grasp constraints) on the same flows
 - [ ] **Learned policy** vs that baseline
 - [ ] **Ablation:** policy conditioned on hand flow vs cup flow vs both
 - [ ] **Robustness:** add noise to the input flow; how fast does success drop?

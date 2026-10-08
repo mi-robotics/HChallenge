@@ -1,0 +1,258 @@
+{
+  "none": [
+    {
+      "demo": "20261008_184449",
+      "success": true,
+      "cup_final_xy_to_plate_cm": 0.4,
+      "cup_max_lift_cm": 9.9
+    },
+    {
+      "demo": "20261008_184503",
+      "success": false,
+      "cup_final_xy_to_plate_cm": 4.0,
+      "cup_max_lift_cm": 6.7
+    },
+    {
+      "demo": "20261008_184518",
+      "success": false,
+      "cup_final_xy_to_plate_cm": 39.9,
+      "cup_max_lift_cm": 3.6
+    },
+    {
+      "demo": "20261008_184533",
+      "success": true,
+      "cup_final_xy_to_plate_cm": 0.9,
+      "cup_max_lift_cm": 11.8
+    },
+    {
+      "demo": "20261008_184547",
+      "success": false,
+      "cup_final_xy_to_plate_cm": 13.3,
+      "cup_max_lift_cm": 12.2
+    }
+  ],
+  "approach": [
+    {
+      "demo": "20261008_184449",
+      "success": true,
+      "cup_final_xy_to_plate_cm": 0.2,
+      "cup_max_lift_cm": 9.7
+    },
+    {
+      "demo": "20261008_184503",
+      "success": false,
+      "cup_final_xy_to_plate_cm": 3.4,
+      "cup_max_lift_cm": 7.1
+    },
+    {
+      "demo": "20261008_184518",
+      "success": true,
+      "cup_final_xy_to_plate_cm": 0.8,
+      "cup_max_lift_cm": 12.9
+    },
+    {
+      "demo": "20261008_184533",
+      "success": true,
+      "cup_final_xy_to_plate_cm": 1.1,
+      "cup_max_lift_cm": 11.8
+    },
+    {
+      "demo": "20261008_184547",
+      "success": false,
+      "cup_final_xy_to_plate_cm": 17.5,
+      "cup_max_lift_cm": 0.5
+    }
+  ],
+  "settle": [
+    {
+      "demo": "20261008_184449",
+      "success": true,
+      "cup_final_xy_to_plate_cm": 0.2,
+      "cup_max_lift_cm": 10.4
+    },
+    {
+      "demo": "20261008_184503",
+      "success": true,
+      "cup_final_xy_to_plate_cm": 2.8,
+      "cup_max_lift_cm": 6.7
+    },
+    {
+      "demo": "20261008_184518",
+      "success": false,
+      "cup_final_xy_to_plate_cm": 39.9,
+      "cup_max_lift_cm": 3.6
+    },
+    {
+      "demo": "20261008_184533",
+      "success": true,
+      "cup_final_xy_to_plate_cm": 1.6,
+      "cup_max_lift_cm": 12.2
+    },
+    {
+      "demo": "20261008_184547",
+      "success": false,
+      "cup_final_xy_to_plate_cm": 10.4,
+      "cup_max_lift_cm": 12.1
+    }
+  ],
+  "lift": [
+    {
+      "demo": "20261008_184449",
+      "success": true,
+      "cup_final_xy_to_plate_cm": 0.3,
+      "cup_max_lift_cm": 9.9
+    },
+    {
+      "demo": "20261008_184503",
+      "success": true,
+      "cup_final_xy_to_plate_cm": 0.3,
+      "cup_max_lift_cm": 6.7
+    },
+    {
+      "demo": "20261008_184518",
+      "success": false,
+      "cup_final_xy_to_plate_cm": 39.9,
+      "cup_max_lift_cm": 3.6
+    },
+    {
+      "demo": "20261008_184533",
+      "success": true,
+      "cup_final_xy_to_plate_cm": 0.7,
+      "cup_max_lift_cm": 11.8
+    },
+    {
+      "demo": "20261008_184547",
+      "success": false,
+      "cup_final_xy_to_plate_cm": 3.6,
+      "cup_max_lift_cm": 12.2
+    }
+  ],
+  "approach+settle": [
+    {
+      "demo": "20261008_184449",
+      "success": true,
+      "cup_final_xy_to_plate_cm": 0.1,
+      "cup_max_lift_cm": 10.4
+    },
+    {
+      "demo": "20261008_184503",
+      "success": false,
+      "cup_final_xy_to_plate_cm": 3.8,
+      "cup_max_lift_cm": 6.7
+    },
+    {
+      "demo": "20261008_184518",
+      "success": true,
+      "cup_final_xy_to_plate_cm": 0.4,
+      "cup_max_lift_cm": 13.0
+    },
+    {
+      "demo": "20261008_184533",
+      "success": true,
+      "cup_final_xy_to_plate_cm": 1.8,
+      "cup_max_lift_cm": 12.3
+    },
+    {
+      "demo": "20261008_184547",
+      "success": true,
+      "cup_final_xy_to_plate_cm": 1.2,
+      "cup_max_lift_cm": 13.8
+    }
+  ],
+  "approach+lift": [
+    {
+      "demo": "20261008_184449",
+      "success": true,
+      "cup_final_xy_to_plate_cm": 0.1,
+      "cup_max_lift_cm": 9.7
+    },
+    {
+      "demo": "20261008_184503",
+      "success": true,
+      "cup_final_xy_to_plate_cm": 1.1,
+      "cup_max_lift_cm": 7.1
+    },
+    {
+      "demo": "20261008_184518",
+      "success": true,
+      "cup_final_xy_to_plate_cm": 0.7,
+      "cup_max_lift_cm": 12.9
+    },
+    {
+      "demo": "20261008_184533",
+      "success": true,
+      "cup_final_xy_to_plate_cm": 0.8,
+      "cup_max_lift_cm": 11.8
+    },
+    {
+      "demo": "20261008_184547",
+      "success": false,
+      "cup_final_xy_to_plate_cm": 17.5,
+      "cup_max_lift_cm": 0.5
+    }
+  ],
+  "settle+lift": [
+    {
+      "demo": "20261008_184449",
+      "success": true,
+      "cup_final_xy_to_plate_cm": 0.1,
+      "cup_max_lift_cm": 10.4
+    },
+    {
+      "demo": "20261008_184503",
+      "success": true,
+      "cup_final_xy_to_plate_cm": 0.8,
+      "cup_max_lift_cm": 6.7
+    },
+    {
+      "demo": "20261008_184518",
+      "success": false,
+      "cup_final_xy_to_plate_cm": 39.9,
+      "cup_max_lift_cm": 3.6
+    },
+    {
+      "demo": "20261008_184533",
+      "success": true,
+      "cup_final_xy_to_plate_cm": 1.6,
+      "cup_max_lift_cm": 12.2
+    },
+    {
+      "demo": "20261008_184547",
+      "success": false,
+      "cup_final_xy_to_plate_cm": 4.4,
+      "cup_max_lift_cm": 12.1
+    }
+  ],
+  "approach+settle+lift": [
+    {
+      "demo": "20261008_184449",
+      "success": true,
+      "cup_final_xy_to_plate_cm": 0.1,
+      "cup_max_lift_cm": 10.4
+    },
+    {
+      "demo": "20261008_184503",
+      "success": true,
+      "cup_final_xy_to_plate_cm": 0.7,
+      "cup_max_lift_cm": 6.7
+    },
+    {
+      "demo": "20261008_184518",
+      "success": true,
+      "cup_final_xy_to_plate_cm": 0.3,
+      "cup_max_lift_cm": 13.0
+    },
+    {
+      "demo": "20261008_184533",
+      "success": true,
+      "cup_final_xy_to_plate_cm": 1.8,
+      "cup_max_lift_cm": 12.3
+    },
+    {
+      "demo": "20261008_184547",
+      "success": true,
+      "cup_final_xy_to_plate_cm": 1.2,
+      "cup_max_lift_cm": 13.8
+    }
+  ]
+}
