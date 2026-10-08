@@ -18,7 +18,9 @@ at its pixel disagrees with where the point should be:
   hand  expected position: MediaPipe's metric 3D hand shape (world landmarks) fitted to the D405 points of its 21
         landmarks with a RANSAC similarity fit (rotation, translation, scale; inliers within 1.5 cm). Occluded if the
         D405 sees something > IN_FRONT_M in front of it, > BEHIND_M behind it (the pixel is off the hand), or has
-        no depth there. Frames without MediaPipe or with < 8 landmarks with depth: CoTracker's visibility only.
+        no depth there, or it is within EDGE_PX of the image border (demo 5: the hand leaves the image and the tracks
+        sit on the border). Frames without MediaPipe or with < 8 landmarks with depth: CoTracker's visibility and
+        the border check only.
         (Using MediaPipe's z directly, without the fit, gave per-landmark biases of -6 to +5 cm: the wrist was
         "occluded" in 92-100% of frames.)
   mug   expected depth = the stand-in mug point's depth. The white mug itself has no D405 depth, so a valid depth
@@ -52,6 +54,7 @@ QUERY_EVERY = 15  # frames (0.5 s)
 IN_FRONT_M, BEHIND_M = 0.03, 0.05
 FIT_INLIER_M = 0.015
 FAR_PX = 40
+EDGE_PX = 10
 # BGR of dataviz slots 1-4: back of hand (wrist + knuckles), thumb tip, index tip, mug; red = occluded
 BLUE, ORANGE, GREEN, YELLOW, RED = (214, 120, 42), (52, 104, 235), (122, 175, 27), (0, 161, 237), (40, 40, 220)
 HAND_COLOUR = [BLUE, ORANGE, GREEN, BLUE, BLUE, BLUE]
@@ -151,7 +154,9 @@ def track(demo, model):
     in_front = checked & (d_hand > 0) & (d_hand < expected - IN_FRONT_M)
     off_hand = checked & (d_hand > expected + BEHIND_M)
     no_depth = checked & (d_hand == 0)
-    visible = co_vis & ~in_front & ~off_hand & ~no_depth
+    h, w = frames.shape[1:3]
+    at_edge = (uv[..., 0] < EDGE_PX) | (uv[..., 0] > w - 1 - EDGE_PX) | (uv[..., 1] < EDGE_PX) | (uv[..., 1] > h - 1 - EDGE_PX)
+    visible = co_vis & ~in_front & ~off_hand & ~no_depth & ~at_edge
     cup_in_front = (d_cup > 0) & (d_cup < cam[..., 2] - IN_FRONT_M)
     cup_off = d_cup > cam[..., 2] + BEHIND_M
     cup_far = np.linalg.norm(cup_uv - project(cup3d, R, tv, K, dist), axis=2) > FAR_PX
@@ -166,8 +171,8 @@ def track(demo, model):
           + ", ".join(f"{p} {np.median(e):.0f}/{np.percentile(e, 95):.0f}/{e.max():.0f}" for p, e in zip(HAND_POINTS, err.T)))
     print(f"   depth-checked {checked[:, 0].mean() * 100:.0f}% of frames | occluded %: " + ", ".join(
         f"{p} {(~v).mean() * 100:.0f} (CoTracker {(~c).mean() * 100:.0f}, in front {f.mean() * 100:.0f}, off hand "
-        f"{o.mean() * 100:.0f}, no depth {z.mean() * 100:.0f})"
-        for p, v, c, f, o, z in zip(HAND_POINTS, visible.T, co_vis.T, in_front.T, off_hand.T, no_depth.T)))
+        f"{o.mean() * 100:.0f}, no depth {z.mean() * 100:.0f}, edge {e.mean() * 100:.0f})"
+        for p, v, c, f, o, z, e in zip(HAND_POINTS, visible.T, co_vis.T, in_front.T, off_hand.T, no_depth.T, at_edge.T)))
     print(f"   mug: occluded {(~cup_visible).mean() * 100:.0f}% (CoTracker {(~cup_co_vis).mean() * 100:.0f}, hand in "
           f"front {cup_in_front.mean() * 100:.0f}, off mug {cup_off.mean() * 100:.0f}, far from stand-in {cup_far.mean() * 100:.0f}); px from the stand-in mug points median "
           f"{np.median(np.linalg.norm(cup_uv - project(cup3d, R, tv, K, dist), axis=2)):.0f}")
