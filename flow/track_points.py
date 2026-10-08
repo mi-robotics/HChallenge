@@ -210,9 +210,9 @@ def overlay(demo, frames, uv, visible, cup_uv, cup_visible, mp, detected, q):
     return out
 
 
-def legend(path, w=640, h=360):
+def legend(path, w=640, h=360, rows=None):
     img = np.full((h, w, 3), 255, np.uint8)
-    rows = [(BLUE, "wrist + knuckles (CoTracker)", "dot"), (ORANGE, "thumb tip", "dot"), (GREEN, "index tip", "dot"),
+    rows = rows or [(BLUE, "wrist + knuckles (CoTracker)", "dot"), (ORANGE, "thumb tip", "dot"), (GREEN, "index tip", "dot"),
             (YELLOW, "mug (CoTracker)", "dot"), (RED, "occluded", "dot"), ((90, 90, 90), "MediaPipe landmark", "ring")]
     for k, (c, text, kind) in enumerate(rows):
         y = 50 + k * 50
@@ -224,11 +224,11 @@ def legend(path, w=640, h=360):
     cv2.imwrite(str(path), img)
 
 
-def tile(videos, out_path, seconds):
+def tile(videos, out_path, seconds, legend_rows=None):
     tw, th = 640, 360
     n = len(videos)
     legend_png = out_path.parent / "legend.png"
-    legend(legend_png, tw, th)
+    legend(legend_png, tw, th, legend_rows)
     f = "".join(f"[{i}:v]scale={tw}:{th},drawtext=text='demo {i + 1}':x=10:y={th - 30}:fontsize=20:fontcolor=white:"
                 f"box=1:boxcolor=black@0.5[v{i}];" for i in range(n))
     cells = [f"{(i % 3) * tw}_{(i // 3) * th}" for i in range(n + 1)]

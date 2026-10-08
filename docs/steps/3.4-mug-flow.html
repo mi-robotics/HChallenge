@@ -1,0 +1,49 @@
+<title>Step 3.4 · Mug Flow</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;700;800&family=JetBrains+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: single column. Title, the trajectory plot, then the files */
+:root {
+  --bg: #f5f6f8; --surface: #ffffff; --fg: #1a1e26; --muted: #5d6573; --line: #dde1e8; --accent: #2d4fd0;
+  --display: "Archivo", "Helvetica Neue", Arial, sans-serif;
+  --mono: "JetBrains Mono", ui-monospace, Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #12151b; --surface: #1a1e26; --fg: #e6e9ef; --muted: #98a0ae; --line: #2c323d; --accent: #8aa2ff; color-scheme: dark } }
+:root[data-theme="dark"] {
+  --bg: #12151b; --surface: #1a1e26; --fg: #e6e9ef; --muted: #98a0ae; --line: #2c323d; --accent: #8aa2ff; color-scheme: dark }
+
+body { background: var(--bg); color: var(--fg); font: 15px/1.5 var(--display); padding-inline: 16px; padding-block: 40px 64px; }
+main { max-width: 56rem; margin: 0 auto; display: grid; gap: 28px; }
+.eyebrow { font: 500 12px/1 var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+h1 { font: 800 clamp(28px, 6vw, 38px)/1.1 var(--display); margin: 10px 0 0; text-wrap: balance; }
+pre { margin: 0; padding: 14px 16px; background: var(--surface); border: 1px solid var(--line); border-radius: 6px; font: 13.5px/1.6 var(--mono); overflow-x: auto; }
+figcaption { font: 13px/1.5 var(--mono); color: var(--muted); }
+figure { margin: 0; display: grid; gap: 8px; }
+img.result { display: block; width: 100%; max-width: 100%; border-radius: 6px; border: 1px solid var(--line); background: var(--surface); }
+.files { list-style: none; margin: 0; padding: 0; display: grid; }
+.files li { display: grid; grid-template-columns: minmax(0, 13rem) 1fr; gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--line); }
+.files a { font: 13.5px var(--mono); color: var(--accent); overflow-wrap: anywhere; }
+.files a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.files span { color: var(--muted); }
+@media (max-width: 480px) { .files li { grid-template-columns: 1fr; gap: 2px; } }
+</style>
+
+<main>
+  <header>
+    <span class="eyebrow">Step 3.4 · Phase 3</span>
+    <h1>Mug flow, checked against PnP</h1>
+  </header>
+
+  <figure>
+    <img class="result" src="media/phase3/task4/mug_check.png" alt="Five rows, one per demo: mug height above the table over time. Blue: the flow (tracked pixels, depth from the hand). Orange: PnP from the tracked mug points alone. They agree while the mug stands still; while it is carried (shaded) PnP drifts by up to 10 cm and jumps back at the release.">
+    <figcaption>Mug standing still: PnP and flow agree within a median 3–10 mm. Carried (shaded): PnP drifts along the camera's line of sight and jumps back at release, so the flow keeps the hand-derived depth.</figcaption>
+  </figure>
+
+  <ul class="files">
+    <li><a href="https://github.com/mi-robotics/HumanoidsChallenge/blob/main/flow/to_flow.py" target="_blank" rel="noopener">flow/to_flow.py</a><span>Mug flow: tracked pixel + hand-derived depth; hidden mug points move with the visible ones</span></li>
+    <li><a href="https://github.com/mi-robotics/HumanoidsChallenge/blob/main/flow/mug_check.py" target="_blank" rel="noopener">flow/mug_check.py</a><span>PnP check and this plot</span></li>
+    <li><a href="https://github.com/mi-robotics/HumanoidsChallenge/blob/main/flow/track_points.py" target="_blank" rel="noopener">flow/track_points.py</a><span>Mug point tracking (step 3.2)</span></li>
+    <li><a href="https://github.com/mi-robotics/HumanoidsChallenge/blob/main/media/phase3/task4/mug_check.png" target="_blank" rel="noopener">media/phase3/task4/mug_check.png</a><span>This plot</span></li>
+  </ul>
+</main>

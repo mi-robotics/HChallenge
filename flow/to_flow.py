@@ -3,11 +3,14 @@
   python flow/to_flow.py [data/demos/<demo> ...]     (default: all demos)
 
 Hand: tracked pixel + D405 depth at that pixel (median of a 7x7 patch), then the marker pose, as in step 1.5.
-Mug: tracked pixel + the stand-in mug point's depth (flow/format.py; the D405 has no depth on the white mug), so
-the mug's image position comes from tracking and only its distance from the camera from the hand.
+Mug: tracked pixel + the stand-in mug point's depth (flow/format.py, moved with the CoTracker pinch point; the D405
+has no depth on the white mug), so the mug's image position comes from tracking and only its distance from the camera
+from the hand. (Depth from PnP on the tracked mug points drifts during the carry: flow/mug_check.py.)
 Then sampled at 10 Hz: each step is the mean of the visible camera frames within +-50 ms (about 3 frames; taking
 only the nearest frame left about twice the frame-to-frame jitter of the smoothed step 1.6 path). visible = the step
-3.2 occlusion check (any visible frame in the window); hidden points interpolated.
+3.2 occlusion check (any visible frame in the window). Hidden hand points: linear interpolation. Hidden mug points
+move with the mug's visible points (their mean + this point's offset from it at the nearest step where it was
+visible); plain interpolation drew hidden mug points across empty table over hidden runs of up to 3 s.
 
 Checks: pinch point (thumb/index midpoint) vs the step 1.6 MediaPipe trajectory (outside MediaPipe's gaps, where
 step 1.6 only interpolates; in demo 5's 0.7 s gap the tracks show the hand swinging ~10 cm towards the camera, which
@@ -24,22 +27,23 @@ import numpy as np
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "flow"))
 sys.path.insert(0, str(ROOT / "replay"))
-from format import DTYPE, HAND_POINTS, HZ, N_CUP_POINTS, check, cup_from_hand, fill_hidden, from_mediapipe  # noqa: E402
+from format import DTYPE, HAND_POINTS, HZ, N_CUP_POINTS, check, cup_from_hand, fill_hidden  # noqa: E402
 from to_table import demo_marker_pose, pixels_to_table  # noqa: E402
 from track_hand import depth_at, depth_frames  # noqa: E402
 
 MEDIA = ROOT / "media" / "phase3" / "task3"
 
 
-def to_flow(demo):
+def tracked_hand(demo):
+    """CoTracker hand points in the table frame at every camera frame: (t [T], hand [6, T, 4] with hidden points
+    interpolated, as in the flow format, plus what the mug needs: K, dist, R, tv, cotracker data)."""
     demo = Path(demo)
     meta = json.loads((demo / "meta.json").read_text())
     K, dist = np.array(meta["camera_matrix"]), np.array(meta["dist_coeffs"])
     R, tv, _ = demo_marker_pose(demo, K, dist)
-    ct, hand_mp, rt = np.load(demo / "cotracker.npz"), np.load(demo / "hand.npz"), np.load(demo / "retarget.npz")
+    ct, hand_mp = np.load(demo / "cotracker.npz"), np.load(demo / "hand.npz")
     n = len(ct["uv"])
     t_cam = (hand_mp["t_ms"][:n] - hand_mp["t_ms"][0]) / 1000
-
     d_hand = np.zeros((n, len(HAND_POINTS)))
     for i, d_raw in enumerate(depth_frames(demo / "depth.mkv", tuple(meta["image_size"]))):
         if i >= n:
@@ -48,11 +52,46 @@ def to_flow(demo):
         d_hand[i] = [depth_at(d_m, p) for p in ct["uv"][i]]
     vis = ct["visible"] & (d_hand > 0)
     hand3d = pixels_to_table(ct["uv"].reshape(-1, 2), np.maximum(d_hand, 1e-3).ravel(), K, dist, R, tv).reshape(n, -1, 3)
+    hand = np.zeros((len(HAND_POINTS), n, 4), DTYPE)
+    for j in range(len(HAND_POINTS)):
+        hand[j, :, :3] = fill_hidden(hand3d[:, j], vis[:, j])
+        hand[j, :, 3] = vis[:, j]
+    return t_cam, hand, hand3d, vis, (K, dist, R, tv, ct)
 
-    _, hand30, _ = from_mediapipe(demo, hz=None)
-    cup_standin = cup_from_hand(demo, t_cam, hand30)[:, :n, :3]  # [8, T, 3]
-    z_cam = (cup_standin.transpose(1, 0, 2) @ R.T + np.ravel(tv))[..., 2]  # [T, 8]
-    cup3d = pixels_to_table(ct["cup_uv"].reshape(-1, 2), z_cam.ravel(), K, dist, R, tv).reshape(n, -1, 3)
+
+def tracked_mug(demo, t_cam, hand, K, dist, R, tv, ct):
+    """Mug points [T, 8, 3] in the table frame: tracked pixel + the stand-in point's depth."""
+    standin = cup_from_hand(demo, t_cam, hand)[:, :, :3]  # [8, T, 3]
+    z_cam = (standin.transpose(1, 0, 2) @ R.T + np.ravel(tv))[..., 2]  # [T, 8]
+    return pixels_to_table(ct["cup_uv"].reshape(-1, 2), z_cam.ravel(), K, dist, R, tv).reshape(len(t_cam), -1, 3)
+
+
+def fill_rigid(p, v):
+    """Fill hidden points of a rigid object ([N, P, 3], [N, P]) from the visible ones; steps with no visible point
+    fall back to linear interpolation."""
+    p = p.copy()
+    any_vis = v.any(1)
+    centre = np.where(any_vis[:, None], (p * v[..., None]).sum(1) / np.maximum(v.sum(1), 1)[:, None], np.nan)
+    for j in range(p.shape[1]):
+        ok = np.flatnonzero(v[:, j])
+        if not len(ok):
+            continue
+        offset = p[ok, j] - centre[ok]  # offset from the visible mean while j is visible
+        for k in np.flatnonzero(~v[:, j] & any_vis):
+            p[k, j] = centre[k] + offset[np.abs(ok - k).argmin()]
+    for j in range(p.shape[1]):
+        known = v[:, j] | any_vis
+        if known.any():
+            p[:, j] = fill_hidden(p[:, j], known)
+    return p
+
+
+def to_flow(demo):
+    demo = Path(demo)
+    rt = np.load(demo / "retarget.npz")
+    t_cam, hand_ct, hand3d, vis, (K, dist, R, tv, ct) = tracked_hand(demo)
+    n = len(t_cam)
+    cup3d = tracked_mug(demo, t_cam, hand_ct, K, dist, R, tv, ct)
 
     t = np.arange(0, t_cam[-1] + 1e-9, 1 / HZ)
     win = (np.abs(t_cam[None] - t[:, None]) <= 0.5 / HZ).astype(float)  # [N steps, T frames]
@@ -66,6 +105,8 @@ def to_flow(demo):
         for j in range(p3.shape[1]):
             flow[j, :, :3] = fill_hidden(p3[:, j], v[:, j]) if v[:, j].any() else p3[:, j]
             flow[j, :, 3] = v[:, j]
+        if name == "cup":
+            flow[..., :3] = fill_rigid(p3, v).transpose(1, 0, 2)
         out[name] = flow
     check(out["hand"], len(HAND_POINTS))
     check(out["cup"], N_CUP_POINTS)
