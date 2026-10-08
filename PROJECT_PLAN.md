@@ -27,7 +27,7 @@ At the end: **real photo + instruction → flow → robot does the task in sim.*
 | Point tracking | CoTracker (offline) | For clean action flow in the dataset. |
 | Flow format | Points × timesteps × (x, y, z, visible), in table coordinates | Same format everywhere. Defined in Phase 3. |
 | Compute | Laptop for sim + teleop, Google Colab GPU for training | |
-| Deadline | Fri 9 Oct 2026, 23:59 BST | From the job posting. |
+| Deadline | ___ | |
 
 ---
 

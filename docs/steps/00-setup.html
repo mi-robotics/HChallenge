@@ -35,8 +35,6 @@ ul { margin: 0; padding-left: 1.2em; display: grid; gap: 6px; }
 code { font: 14px var(--mono); background: var(--code-bg); padding: 1px 5px; border-radius: 3px; overflow-wrap: anywhere; }
 pre { margin: 0; background: var(--code-bg); border-radius: 6px; padding: 14px 16px; overflow-x: auto; font: 13.5px/1.55 var(--mono); }
 pre code { background: none; padding: 0; }
-.callout { border: 1px solid var(--warn); border-radius: 6px; padding: 14px 16px; display: grid; gap: 6px; background: var(--surface); }
-.callout strong { font-family: var(--display); color: var(--warn); }
 .files { width: 100%; border-collapse: collapse; font-size: 15px; }
 .files td { padding: 8px 0; border-bottom: 1px solid var(--line); vertical-align: top; }
 .files td:first-child { width: 11rem; padding-right: 12px; }
@@ -57,18 +55,12 @@ a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
     <div><dt>Repo</dt><dd>mi-robotics/HumanoidsChallenge</dd></div>
     <div><dt>Conda env</dt><dd>humanoidschallenge</dd></div>
     <div><dt>Python</dt><dd>3.10.22</dd></div>
-    <div><dt>Deadline</dt><dd class="warn">Fri 9 Oct, 23:59 BST</dd></div>
   </dl>
 
   <section>
     <h2>The challenge, in their words</h2>
     <p>Use real data collected by the applicant (a phone is enough) to drive a robotic manipulator in a simple simulation environment such as LIBERO. Showcase knowledge of VLAs and/or world models. Submit a public GitHub repo with a README covering how to run it, example outputs, design choices, and what worked and what didn't.</p>
     <p>They judge on: creativity (the collected data must play a role), policy performance in sim and/or world-model prediction quality, implementation simplicity, and clear results "without AI slop".</p>
-  </section>
-
-  <section class="callout">
-    <strong>Timeline risk</strong>
-    <p>The posting gives the deadline as Friday 9 October 2026, 23:59 BST. Today is 8 October, so about 1.5 days remain. The full plan (6 phases, 50–100 teleop episodes, two trained models) does not fit that window. We need to cut scope to a minimal end-to-end path before starting Phase 1.</p>
   </section>
 
   <section>
@@ -103,7 +95,7 @@ git push -u origin main</code></pre>
 
   <section>
     <h2>Next</h2>
-    <p>Agree a cut-down scope that fits the deadline, then start Phase 1, step 1: a sim scene with a Panda arm, table, cup and plate, and a gripper we can move to target positions.</p>
+    <p>Phase 1, step 1: a sim scene with a Panda arm, table, cup and plate, and a gripper we can move to target positions.</p>
   </section>
 
   <footer>HumanoidsChallenge · docs/steps/00-setup.html</footer>

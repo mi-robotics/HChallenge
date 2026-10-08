@@ -4,7 +4,6 @@ Submission for the Humanoid "Internship, Robot Learning Research" challenge:
 use data I personally recorded (phone video of my hand) to drive a Panda arm in a
 simple sim (LIBERO / robosuite). Submitted as a public GitHub repo with a README.
 
-- **Deadline: Friday 9 October 2026, 23:59 BST.** Scope every decision against this.
 - Reviewers judge: creativity (my own data must play a role), sim performance and/or
   world-model quality, implementation simplicity, clear results with **no AI slop**.
 - Full plan: `PROJECT_PLAN.md` (phases 1–6 + write-up). It is the source of truth for
