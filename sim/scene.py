@@ -37,6 +37,28 @@ def reset(env, settle_steps=10):
     return obs
 
 
+def place(env, cup_xy, plate_xy, settle_steps=10):
+    """Move the cup and plate to the given world xy (keeps height and orientation), then let them settle."""
+    sim = env.env.sim
+    for name, xy in ((CUP, cup_xy), (PLATE, plate_xy)):
+        joint = env.env.objects_dict[name].joints[-1]
+        q = sim.data.get_joint_qpos(joint).copy()
+        q[:2] = xy
+        sim.data.set_joint_qpos(joint, q)
+        sim.data.set_joint_qvel(joint, np.zeros(6))
+    sim.forward()
+    obs = None
+    for _ in range(settle_steps):
+        obs, *_ = env.step(np.array([0, 0, 0, 0, 0, 0, OPEN]))
+    return obs
+
+
+def rim_grasp_point(obs):
+    """Where the gripper's fingertip centre goes to grasp the mug rim (world frame)."""
+    cup = obs[f"{CUP}_pos"]
+    return np.array([cup[0], cup[1] + RIM_OFFSET, cup[2] + CUP_HEIGHT - 0.03])
+
+
 def step_towards(obs, target, gripper):
     """One action that moves the end-effector towards `target` (world xyz, metres), orientation held."""
     err = np.asarray(target) - obs["robot0_eef_pos"]
@@ -64,6 +86,24 @@ def set_gripper(env, obs, gripper, steps=15, frames=None):
         if frames is not None:
             frames.append(frame(obs))
     return obs
+
+
+def set_camera(env, name, pos, R_world_from_cv, fovy_deg):
+    """Move a world-attached sim camera to an OpenCV-convention pose (x right, y down, looking along +z).
+    MuJoCo cameras look along -z with y up, so flip the y and z axes."""
+    from scipy.spatial.transform import Rotation
+    m = env.env.sim.model
+    cid = m.camera_name2id(name)
+    x, y, z, w = Rotation.from_matrix(R_world_from_cv @ np.diag([1, -1, -1])).as_quat()
+    m.cam_pos[cid] = pos
+    m.cam_quat[cid] = [w, x, y, z]
+    m.cam_fovy[cid] = fovy_deg
+    env.env.sim.forward()  # the renderer reads the camera's world pose from data, updated by forward()
+
+
+def render(env, name, width, height):
+    """RGB image from a sim camera (right way up)."""
+    return env.env.sim.render(width=width, height=height, camera_name=name)[::-1]
 
 
 def frame(obs):
@@ -99,7 +139,7 @@ if __name__ == "__main__":
     obs, *_ = move_to(env, obs, start)
 
     # 2) Scripted pick-and-place with a rim grasp.
-    grasp = np.r_[cup[0], cup[1] + RIM_OFFSET, table_z + CUP_HEIGHT - 0.03]
+    grasp = rim_grasp_point(obs)
     place = np.r_[plate[:2] + [0, RIM_OFFSET], grasp[2] + 0.025]
     plan = [
         ("above rim", grasp + [0, 0, 0.08], OPEN),

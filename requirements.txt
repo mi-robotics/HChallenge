@@ -6,6 +6,7 @@ bddl==1.0.1
 easydict==1.13
 opencv-python==4.11.0.86
 pillow==12.3.0
+scipy==1.15.3
 # Camera (step 1.2)
 pyrealsense2==2.58.4.10922
 # Hand tracking (step 1.4). Install mediapipe with --no-deps: it asks for opencv-contrib-python,
