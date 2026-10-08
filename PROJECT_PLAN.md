@@ -82,6 +82,7 @@ project/
 - **1.2** Switched phone → D405. Printer scales A4 to 89%; with measured sizes, depth and image-based distance agree within 1.7 mm at 35 cm. Table marker: 30/30 frames, pose jitter 1–2 mm.
 - **1.3** 5 demos, 307–345 frames each, 0 dropped, marker visible 99–100% of frames. I grasp the mug around its body from the side, while the sim robot uses a top-down rim grasp: Phase 1 maps the wrist path and grasp timing, not the grasp style. My left hand is on the keyboard at the start/end (pressing s/e): track the right hand only. The cup and plate are further from the camera than the marker (beyond the D405's best range of 50 cm).
 - **1.4** MediaPipe hand landmarker, right hand only (labelled "Right" on this camera; the docs' mirrored-image caveat does not apply). Right hand found in 70 / 87 / 100 / 100 / 98% of frames. Demo 1 loses it for 2.7 s (frames 34–113) because the cup was at the top edge of the image and the hand left the frame; demos 2 and 5 have only 1–5-frame gaps. When the hand is found, D405 depth is valid at the thumb and index tips 100% of the time and at the wrist 84–100%; wrist depth 40–72 cm.
+- **Setup change (after 1.4):** camera re-aimed and marker moved for a bigger workspace. Marker rotated so x points away from the camera (camera now at x = −41.9, y = 0.3, z = 43.9 cm in the table frame, i.e. where the sim robot base is). Marker 61 cm away, 30/30 frames, jitter 1–3 mm. The 1.3 demos were moved to `data/demos_old/` and will be re-recorded with this setup.
 
 ### Watch out for
 
