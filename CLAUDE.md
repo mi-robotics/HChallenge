@@ -66,7 +66,7 @@ simple sim (LIBERO / robosuite). Submitted as a public GitHub repo with a README
   frames.csv, meta.json). `replay/track_hand.py` adds hand.npz + hand_overlay.mp4.
 - MediaPipe hand landmarker model: `third_party/mediapipe/hand_landmarker.task` (float16/1, downloaded).
   On this camera the moving right hand is labelled "Right" (not mirrored); the left hand rests on the keyboard.
-- Demo 1 (20261008_182457) loses the hand for frames 34–113: the cup was at the top edge of the image.
+- Current demos (new setup, marker x away from camera): data/demos/20261008_1844*–1845*. Old setup demos in data/demos_old/ (not used).
 
 ## Repo
 
