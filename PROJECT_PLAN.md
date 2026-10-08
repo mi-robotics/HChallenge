@@ -61,7 +61,7 @@ project/
 
 1. **Set up the sim scene.** Panda arm, table, cup, plate. Make sure I can move the gripper to a target position and open/close it.
 2. **Print and place the ArUco marker** on the table. Check the D405 factory calibration against the ChArUco board and the depth sensor.
-3. **Record one short demo** (5–10 seconds) of picking up the cup and putting it on the plate, with the marker visible.
+3. **Record demos** (5 × 10–11 s, `replay/record.py`) of picking up the cup and putting it on the plate, with the marker visible.
 4. **Track my hand** in every frame with MediaPipe. Get wrist and fingertip positions.
 5. **Convert to table coordinates** using the marker, so positions are in centimetres on the table, not pixels.
 6. **Clean it up.** Smooth the trajectory and resample it to the sim's control rate (20 Hz).
@@ -75,6 +75,12 @@ project/
 - [ ] Hand positions are in table coordinates (sanity check: they land on the table, not floating or below it)
 - [ ] The sim robot follows the motion from my video
 - [ ] I have a side-by-side video: real demo | sim replay
+
+### Notes
+
+- **1.1** Pushing a mug onto a plate failed in sim (0/21): it tips on the rim or shoves the plate. Switched to pick-and-place; scripted rim grasp 8/8.
+- **1.2** Switched phone → D405. Printer scales A4 to 89%; with measured sizes, depth and image-based distance agree within 1.7 mm at 35 cm. Table marker: 30/30 frames, pose jitter 1–2 mm.
+- **1.3** 5 demos, 307–345 frames each, 0 dropped, marker visible 99–100% of frames. I grasp the mug around its body from the side, while the sim robot uses a top-down rim grasp: Phase 1 maps the wrist path and grasp timing, not the grasp style. My left hand is on the keyboard at the start/end (pressing s/e): track the right hand only. The cup and plate are further from the camera than the marker (beyond the D405's best range of 50 cm).
 
 ### Watch out for
 
