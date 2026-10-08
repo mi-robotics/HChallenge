@@ -1,8 +1,9 @@
 """Cup-on-plate sim scene: Panda + table + mug + plate in LIBERO, and helpers to move the gripper.
 
 Run `python sim/scene.py` to check the scene: free-space target accuracy, then a scripted
-rim-grasp pick-and-place. Saves a GIF + contact sheet to media/.
+rim-grasp pick-and-place. Saves an MP4 of the pick-and-place to media/.
 """
+import subprocess
 from pathlib import Path
 
 import numpy as np
@@ -70,17 +71,22 @@ def frame(obs):
     return obs["agentview_image"][::-1]
 
 
-if __name__ == "__main__":
-    from PIL import Image
+def save_mp4(frames, path, fps=20):
+    """H.264 MP4 via system ffmpeg, so it plays in browsers."""
+    h, w, _ = frames[0].shape
+    cmd = ["ffmpeg", "-y", "-loglevel", "error", "-f", "rawvideo", "-pix_fmt", "rgb24", "-s", f"{w}x{h}",
+           "-r", str(fps), "-i", "-", "-c:v", "libx264", "-pix_fmt", "yuv420p", "-crf", "23", str(path)]
+    subprocess.run(cmd, input=np.stack(frames).tobytes(), check=True)
 
-    env = make_env()
+
+if __name__ == "__main__":
+    env = make_env(img_size=512)
     obs = reset(env)
     print("instruction:", env.language_instruction)
     print("eef start:", obs["robot0_eef_pos"].round(3))
     cup, plate = obs[f"{CUP}_pos"], obs[f"{PLATE}_pos"]
     print("cup:", cup.round(3), " plate:", plate.round(3))
 
-    frames = [frame(obs)]
     start = obs["robot0_eef_pos"].copy()
 
     # 1) Free-space accuracy: corners of a 20 x 20 cm square, 15 cm above the table, away from objects.
@@ -88,9 +94,9 @@ if __name__ == "__main__":
     print("free-space targets:")
     for dx, dy in [(-0.1, 0.12), (0.1, 0.12), (0.1, 0.32), (-0.1, 0.32)]:
         tgt = np.array([dx, dy, table_z + 0.15])
-        obs, steps, err = move_to(env, obs, tgt, frames=frames)
+        obs, steps, err = move_to(env, obs, tgt)
         print(f"  target {tgt.round(2)}  steps={steps:3d}  error={err * 1000:4.1f} mm")
-    obs, *_ = move_to(env, obs, start, frames=frames)
+    obs, *_ = move_to(env, obs, start)
 
     # 2) Scripted pick-and-place with a rim grasp.
     grasp = np.r_[cup[0], cup[1] + RIM_OFFSET, table_z + CUP_HEIGHT - 0.03]
@@ -106,6 +112,7 @@ if __name__ == "__main__":
         ("retreat", place + [0, 0, 0.1], OPEN),
     ]
     print("scripted pick-and-place:")
+    frames = [frame(obs)]
     for name, tgt, grip in plan:
         if tgt is None:
             obs = set_gripper(env, obs, grip, steps=20, frames=frames)
@@ -120,9 +127,5 @@ if __name__ == "__main__":
 
     out = Path(__file__).resolve().parents[1] / "media"
     out.mkdir(exist_ok=True)
-    imgs = [Image.fromarray(f) for f in frames[::2]]
-    imgs[0].save(out / "1.1_scene.gif", save_all=True, append_images=imgs[1:], duration=100, loop=0)
-    picks = np.linspace(0, len(frames) - 1, 8).astype(int)
-    sheet = np.concatenate([frames[i] for i in picks], axis=1)
-    Image.fromarray(sheet).save(out / "1.1_scene_sheet.png")
-    print(f"saved {len(frames)} frames to {out}")
+    save_mp4(frames + [frames[-1]] * 20, out / "1.1_cup_on_plate.mp4")  # hold the last frame for 1 s
+    print(f"saved {len(frames)} frames to {out / '1.1_cup_on_plate.mp4'}")

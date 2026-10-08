@@ -11,5 +11,5 @@ data/
 *.npz
 third_party/
 
-# Step GIFs are large; README GIFs get added explicitly (git add -f)
-media/*.gif
+# Small result videos for reports/README are kept
+!media/*.mp4

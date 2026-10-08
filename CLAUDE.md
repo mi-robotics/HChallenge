@@ -16,8 +16,10 @@ simple sim (LIBERO / robosuite). Submitted as a public GitHub repo with a README
   The repo layout in `PROJECT_PLAN.md` is a target, not something to scaffold up front.
 - After every step:
   1. Tick the checkbox(es) in `PROJECT_PLAN.md`; update the Key decisions table if a decision changed.
-  2. Write a step report `docs/steps/<phase>.<step>-<slug>.html` (e.g. `1.1-sim-scene.html`:
-     what we did, why, commands, results, numbers, what didn't work) and publish it as an artifact.
+  2. Write a step report `docs/steps/<phase>.<step>-<slug>.html` (e.g. `1.1-sim-scene.html`) and
+     publish it as an artifact. Keep it minimal: the title, the result media (an MP4 in `media/`,
+     H.264, published alongside the page via `files`), and links to the relevant files on GitHub.
+     No long write-ups; findings and numbers go in `PROJECT_PLAN.md` notes and commit messages.
   3. In `docs/tracker.html`, mark the step done (state 1), set the next step to 2, add the
      report URL to that step, and republish to the same artifact URL. Steps in the tracker
      mirror the numbered steps in `PROJECT_PLAN.md` one-to-one.
