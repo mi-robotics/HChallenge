@@ -29,11 +29,15 @@ def depth_frames(path, size):
     w, h = size
     p = subprocess.Popen(["ffmpeg", "-loglevel", "error", "-i", str(path), "-f", "rawvideo",
                           "-pix_fmt", "gray16le", "-"], stdout=subprocess.PIPE)
-    while True:
-        buf = p.stdout.read(w * h * 2)
-        if len(buf) < w * h * 2:
-            return
-        yield np.frombuffer(buf, np.uint16).reshape(h, w)
+    try:
+        while True:
+            buf = p.stdout.read(w * h * 2)
+            if len(buf) < w * h * 2:
+                return
+            yield np.frombuffer(buf, np.uint16).reshape(h, w)
+    finally:  # also runs when the caller stops early
+        p.kill()
+        p.wait()
 
 
 def depth_at(depth_m, uv, r=3):
