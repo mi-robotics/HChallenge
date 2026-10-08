@@ -76,7 +76,7 @@ a { color: var(--accent); }
 
   <div class="overall">
     <div class="bar"><i id="bar" style="width:0%"></i></div>
-    <div class="row"><span id="summary">0 of 0 steps done</span><span>Updated 8 Oct 2026</span></div>
+    <div class="row"><span id="summary">0 of 0 steps done</span><span>Updated 8 Oct 2026 · task changed to pick-and-place in 1.1</span></div>
   </div>
 
   <nav class="strip" id="strip" aria-label="Phases"></nav>
@@ -93,9 +93,9 @@ const PHASES = [
     steps: [["Progress tracker", 1, "https://claude.ai/artifact/4LuyL24MuyqkmJNkJrxKCV"], ["Per-step documentation pages", 1, "https://claude.ai/artifact/4LuyL24MuyqkmJNkJrxKCV"], ["GitHub repo set up and pushed", 1, "https://claude.ai/artifact/4LuyL24MuyqkmJNkJrxKCV"],
       ["Conda env humanoidschallenge (Python 3.10)", 1, "https://claude.ai/artifact/4LuyL24MuyqkmJNkJrxKCV"], ["CLAUDE.md", 1, "https://claude.ai/artifact/4LuyL24MuyqkmJNkJrxKCV"]] },
   { id: "p1", n: "1", name: "Video → sim replay", status: "active", goal: "Make the sim robot copy one recorded hand video, offline.",
-    steps: [["Set up the sim scene: Panda, table, cup, plate; move gripper to targets, open/close", 2],
-      ["Print and place the ArUco marker; calibrate the phone camera (checkerboard)", 0],
-      ["Record one 5–10 s demo of pushing the cup to the plate, marker visible", 0],
+    steps: [["Set up the sim scene: Panda, table, cup, plate; move gripper to targets, open/close", 1, "https://claude.ai/artifact/Cjd2LLGLv7cKccCVsHxw1W"],
+      ["Print and place the ArUco marker; calibrate the phone camera (checkerboard)", 2],
+      ["Record one 5–10 s demo of putting the cup on the plate, marker visible", 0],
       ["Track the hand in every frame with MediaPipe (wrist, fingertips)", 0],
       ["Convert to table coordinates (cm) using the marker", 0],
       ["Smooth and resample the trajectory to 20 Hz", 0],
@@ -109,7 +109,7 @@ const PHASES = [
     steps: [["Define the flow format in flow/FORMAT.md ([points, T, 4], T = 16 at 10 Hz)", 0], ["Run CoTracker on recorded videos", 0], ["Convert trails to table coordinates", 0],
       ["Track points on the cup (object flow)", 0], ["Write a visualiser that draws trails on the video", 0], ["Write the slicing function: episode → training samples", 0]] },
   { id: "p4", n: "4", name: "Data collection", status: "todo", goal: "Record a paired real + sim dataset with teleop (target 50–100 episodes).",
-    steps: [["Place cup and plate in a new grid position", 0], ["Reset so the sim matches the real scene", 0], ["Record: push the real cup while the sim robot follows", 0], ["Stop; note real and sim success", 0], ["Repeat to 50–100 episodes", 0]] },
+    steps: [["Place cup and plate in a new grid position", 0], ["Reset so the sim matches the real scene", 0], ["Record: move the real cup to the plate while the sim robot follows", 0], ["Stop; note real and sim success", 0], ["Repeat to 50–100 episodes", 0]] },
   { id: "p5", n: "5", name: "Flow → action policy", status: "todo", goal: "Policy that turns action flow into robot actions in sim.",
     steps: [["Build the training dataset (flow, sim obs, robot actions)", 0], ["Train the simple baseline (flow + state → actions)", 0], ["Train the main policy (ACT or diffusion) on Colab", 0], ["Evaluate in sim on held-out recorded flows", 0]] },
   { id: "p6", n: "6", name: "Flow generator", status: "todo", goal: "Real photo + instruction → predicted hand flow.",

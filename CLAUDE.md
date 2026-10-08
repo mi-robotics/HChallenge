@@ -30,6 +30,20 @@ simple sim (LIBERO / robosuite). Submitted as a public GitHub repo with a README
   Run things with `conda run -n humanoidschallenge ...` or activate it first.
 - Install packages only when a step needs them, and record them in `requirements.txt`
   at that point.
+- LIBERO is cloned (commit 8f1084e) into `third_party/` (gitignored) and installed with
+  `pip install --no-deps -e third_party/LIBERO --config-settings editable_mode=compat`.
+  Its pinned requirements are old, so we skip them; `requirements.txt` has what it actually needs.
+- The env sets `LIBERO_CONFIG_PATH=third_party/libero_config` (absolute path) and `MUJOCO_GL=egl`
+  via `conda env config vars`. Don't touch `~/.libero/`, which belongs to another env.
+
+## Sim
+
+- Task: `sim/cup_on_plate.bddl` ("put the cup on the plate"), red mug + plate on the LIBERO
+  living-room table. Robot base is at -x and reaches towards +x.
+- `sim/scene.py`: `make_env`, `reset`, `move_to(target_xyz)`, `set_gripper`. Control is
+  OSC_POSE delta at 20 Hz; action[:3] = 1 means 5 cm per step; gripper -1 open, +1 close.
+- The mug (9–10 cm wide, 13.5 cm tall) is too wide for the Panda's 8 cm grip: grasp the rim with
+  one finger inside, at cup centre + 4 cm in y (fingers close along world y).
 - Training runs on Google Colab GPU; sim + teleop run locally.
 
 ## Repo

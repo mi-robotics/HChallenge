@@ -1,0 +1,14 @@
+# Sim (step 1.1). LIBERO itself is installed from source, see CLAUDE.md "Environment".
+numpy==1.26.4
+mujoco==3.8.1
+robosuite==1.4.0
+bddl==1.0.1
+easydict==1.13
+opencv-python==4.11.0.86
+pillow==12.3.0
+# LIBERO import-time deps
+termcolor==3.3.0
+future==1.0.0
+matplotlib==3.10.9
+cloudpickle==3.1.2
+gym==0.26.2

@@ -6,7 +6,7 @@ Humanoid Robot Learning Internship Challenge
 
 ## The idea in one paragraph
 
-I record myself doing a simple task with my hand (pushing a cup to a plate) while my hand **teleoperates a robot in simulation** at the same time. That gives me paired data: real video, my hand's motion as **action flow** (trails of tracked points), and the robot's actions in sim. I then train two models:
+I record myself doing a simple task with my hand (picking up a cup and putting it on a plate) while my hand **teleoperates a robot in simulation** at the same time. That gives me paired data: real video, my hand's motion as **action flow** (trails of tracked points), and the robot's actions in sim. I then train two models:
 
 1. **Flow generator**: looks at a real photo + instruction and predicts the hand's action flow ("how should a hand move to do this?").
 2. **Flow-to-action policy**: takes that flow and turns it into robot actions in sim ("how does the robot make that motion happen?").
@@ -19,7 +19,7 @@ At the end: **real photo + instruction → flow → robot does the task in sim.*
 
 | Decision | Current choice | Notes |
 |---|---|---|
-| Task | Push a cup onto a plate | Pushing avoids grasping, the hardest part. Grasping can be a stretch goal. |
+| Task | Pick up a cup and put it on a plate | Changed from pushing in step 1.1: in sim the mug tips on the plate rim or shoves the plate (0/21 push runs succeeded). A rim grasp (one finger inside the mug) succeeded 8/8. |
 | Simulator | LIBERO (robosuite underneath), Panda arm | May need a simple custom scene: table, cup, plate. |
 | Camera | Phone on a tripod first, head/chest mount later | Tripod is easier to debug. |
 | Calibration | ArUco marker taped to the table | Gives a shared "table frame" for real and sim. |
@@ -61,7 +61,7 @@ project/
 
 1. **Set up the sim scene.** Panda arm, table, cup, plate. Make sure I can move the gripper to a target position and open/close it.
 2. **Print and place the ArUco marker** on the table. Calibrate my phone camera once (checkerboard photos).
-3. **Record one short demo** (5–10 seconds) of pushing the cup to the plate, with the marker visible.
+3. **Record one short demo** (5–10 seconds) of picking up the cup and putting it on the plate, with the marker visible.
 4. **Track my hand** in every frame with MediaPipe. Get wrist and fingertip positions.
 5. **Convert to table coordinates** using the marker, so positions are in centimetres on the table, not pixels.
 6. **Clean it up.** Smooth the trajectory and resample it to the sim's control rate (20 Hz).
@@ -71,7 +71,7 @@ project/
 
 ### Done when
 
-- [ ] Sim scene works and the gripper can be moved to target positions
+- [x] Sim scene works and the gripper can be moved to target positions
 - [ ] Hand positions are in table coordinates (sanity check: they land on the table, not floating or below it)
 - [ ] The sim robot follows the motion from my video
 - [ ] I have a side-by-side video: real demo | sim replay
@@ -79,7 +79,7 @@ project/
 ### Watch out for
 
 - Depth (distance from camera) from a single phone camera is noisy. The marker helps; keep the camera angle steady.
-- If the replayed push misses the cup, check the offset between my wrist and where my fingers actually touched the cup.
+- If the replayed grasp misses the rim, check the offset between my wrist and where my fingers actually closed on the cup.
 
 ---
 
@@ -101,7 +101,7 @@ project/
 ### Done when
 
 - [ ] Robot follows my hand live with acceptable lag (aim for under ~200 ms)
-- [ ] I can push the sim cup onto the sim plate by moving my hand
+- [ ] I can put the sim cup on the sim plate by moving my hand
 - [ ] Recording saves an episode to disk
 - [ ] Short screen recording of live teleop for the README
 
@@ -151,7 +151,7 @@ project/
 
 | Item | Source |
 |---|---|
-| Instruction | Typed or spoken ("push the cup to the plate") |
+| Instruction | Typed or spoken ("put the cup on the plate") |
 | Real video | Phone camera |
 | Hand action flow | Phase 3 pipeline on the real video |
 | Cup flow | Phase 3 pipeline on the real video |
@@ -163,9 +163,9 @@ project/
 
 1. Place the cup and plate in a new position each episode (mark a rough grid of positions on the table).
 2. Press reset so the sim matches the real scene.
-3. Press record, push the **real** cup with my hand while watching the **sim** robot follow.
+3. Press record, move the **real** cup to the plate with my hand while watching the **sim** robot follow.
 4. Stop recording. Note whether both real and sim succeeded.
-5. Repeat. Target **50–100 episodes**. Optional: a few instruction variations ("push the cup left", "push the cup to the plate").
+5. Repeat. Target **50–100 episodes**. Optional: a few instruction variations ("put the cup on the plate", "move the cup to the left").
 
 ### After recording
 
