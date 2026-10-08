@@ -1,0 +1,69 @@
+"""Segment the mug in every frame with SAM 2 (video predictor), from one click in the first frame.
+
+  python flow/mug_sam.py [data/demos/<demo> ...]     (default: all demos)
+
+The click is the hand-derived mug centre (flow/format.py stand-in) projected into the first frame: a stand-in for a
+human click; the mask itself comes from the image only.
+
+Writes mug_mask.npz to each demo folder (packed boolean masks [T, H, W]).
+"""
+import shutil
+import sys
+from pathlib import Path
+
+import cv2
+import numpy as np
+import torch
+
+ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT / "flow"))
+sys.path.insert(0, str(ROOT / "replay"))
+from sam2.build_sam import build_sam2_video_predictor  # noqa: E402
+from to_flow import tracked_hand  # noqa: E402
+from format import cup_from_hand  # noqa: E402
+from track_points import read_video  # noqa: E402
+
+CHECKPOINT = ROOT / "third_party" / "sam2_ckpt" / "sam2.1_hiera_large.pt"
+CONFIG = "configs/sam2.1/sam2.1_hiera_l.yaml"
+
+
+def click(demo):
+    """Projected centre of the stand-in mug in the first frame."""
+    t, hand, _, _, (K, dist, R, tv, _) = tracked_hand(demo)
+    c = cup_from_hand(demo, t, hand)[:, 0, :3].mean(0)
+    return cv2.projectPoints(c[None].astype(np.float64), cv2.Rodrigues(R)[0], np.ravel(tv), K, dist)[0].ravel()
+
+
+def segment(demo, predictor):
+    demo = Path(demo)
+    frames = read_video(demo / "color.mp4")
+    tmp = demo / "_frames_jpg"
+    tmp.mkdir(exist_ok=True)
+    for i, f in enumerate(frames):
+        cv2.imwrite(str(tmp / f"{i:05d}.jpg"), f, [cv2.IMWRITE_JPEG_QUALITY, 95])
+    xy = click(demo)
+    masks = np.zeros(frames.shape[:3], bool)
+    with torch.inference_mode(), torch.autocast("cuda", dtype=torch.bfloat16):
+        state = predictor.init_state(video_path=str(tmp))
+        predictor.add_new_points_or_box(state, frame_idx=0, obj_id=1, points=np.array([xy], np.float32),
+                                        labels=np.array([1], np.int32))
+        for i, _, logits in predictor.propagate_in_video(state):
+            masks[i] = (logits[0, 0] > 0).cpu().numpy()
+    shutil.rmtree(tmp)
+    np.savez_compressed(demo / "mug_mask.npz", packed=np.packbits(masks, axis=-1), shape=masks.shape, click=xy)
+    area = masks.sum((1, 2))
+    print(f"{demo.name}: click {xy.round()} | mask area first frame {area[0]} px, median {np.median(area):.0f}, "
+          f"min {area.min()} px, empty in {(area == 0).sum()} frames")
+    return masks
+
+
+def load_masks(demo):
+    m = np.load(Path(demo) / "mug_mask.npz")
+    return np.unpackbits(m["packed"], axis=-1)[..., :m["shape"][2]].astype(bool)
+
+
+if __name__ == "__main__":
+    demos = sys.argv[1:] or sorted(str(p) for p in (ROOT / "data" / "demos").iterdir() if p.is_dir())
+    predictor = build_sam2_video_predictor(CONFIG, str(CHECKPOINT), device="cuda")
+    for d in demos:
+        segment(d, predictor)

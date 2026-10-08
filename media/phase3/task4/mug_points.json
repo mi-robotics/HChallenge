@@ -1,0 +1,72 @@
+{
+  "20261008_184449": {
+    "geometric": {
+      "query_inside_first_mask": 1.0,
+      "visible": 0.9774096385542169,
+      "inside_mask_when_visible": 1.0,
+      "over_20px_outside_when_visible": 0.0
+    },
+    "mask": {
+      "query_inside_first_mask": 1.0,
+      "visible": 0.8945783132530121,
+      "inside_mask_when_visible": 1.0,
+      "over_20px_outside_when_visible": 0.0
+    }
+  },
+  "20261008_184503": {
+    "geometric": {
+      "query_inside_first_mask": 1.0,
+      "visible": 0.995,
+      "inside_mask_when_visible": 0.9932998324958124,
+      "over_20px_outside_when_visible": 0.0
+    },
+    "mask": {
+      "query_inside_first_mask": 1.0,
+      "visible": 0.87625,
+      "inside_mask_when_visible": 0.995244888254874,
+      "over_20px_outside_when_visible": 0.0
+    }
+  },
+  "20261008_184518": {
+    "geometric": {
+      "query_inside_first_mask": 1.0,
+      "visible": 0.9513274336283186,
+      "inside_mask_when_visible": 1.0,
+      "over_20px_outside_when_visible": 0.0
+    },
+    "mask": {
+      "query_inside_first_mask": 1.0,
+      "visible": 0.890117994100295,
+      "inside_mask_when_visible": 1.0,
+      "over_20px_outside_when_visible": 0.0
+    }
+  },
+  "20261008_184533": {
+    "geometric": {
+      "query_inside_first_mask": 0.875,
+      "visible": 0.9628482972136223,
+      "inside_mask_when_visible": 0.8307877813504824,
+      "over_20px_outside_when_visible": 0.0727491961414791
+    },
+    "mask": {
+      "query_inside_first_mask": 1.0,
+      "visible": 0.913312693498452,
+      "inside_mask_when_visible": 0.9860169491525423,
+      "over_20px_outside_when_visible": 0.0
+    }
+  },
+  "20261008_184547": {
+    "geometric": {
+      "query_inside_first_mask": 1.0,
+      "visible": 0.9915322580645162,
+      "inside_mask_when_visible": 1.0,
+      "over_20px_outside_when_visible": 0.0
+    },
+    "mask": {
+      "query_inside_first_mask": 1.0,
+      "visible": 0.8862903225806451,
+      "inside_mask_when_visible": 0.9995450409463148,
+      "over_20px_outside_when_visible": 0.0
+    }
+  }
+}
