@@ -8,6 +8,13 @@ opencv-python==4.11.0.86
 pillow==12.3.0
 # Camera (step 1.2)
 pyrealsense2==2.58.4.10922
+# Hand tracking (step 1.4). Install mediapipe with --no-deps: it asks for opencv-contrib-python,
+# which clashes with robosuite's opencv-python; it only needs cv2.
+#   pip install --no-deps mediapipe==0.10.35
+absl-py
+flatbuffers
+sounddevice
+certifi
 # LIBERO import-time deps
 termcolor==3.3.0
 future==1.0.0

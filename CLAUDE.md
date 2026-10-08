@@ -60,6 +60,14 @@ simple sim (LIBERO / robosuite). Submitted as a public GitHub repo with a README
 - Live view: `python calibration/d405.py` (only one process can hold the camera).
   Check: `python calibration/d405.py check`.
 
+## Demos and hand tracking
+
+- `replay/record.py` records demos to `data/demos/<timestamp>/` (color.mp4, depth.mkv lossless uint16,
+  frames.csv, meta.json). `replay/track_hand.py` adds hand.npz + hand_overlay.mp4.
+- MediaPipe hand landmarker model: `third_party/mediapipe/hand_landmarker.task` (float16/1, downloaded).
+  On this camera the moving right hand is labelled "Right" (not mirrored); the left hand rests on the keyboard.
+- Demo 1 (20261008_182457) loses the hand for frames 34–113: the cup was at the top edge of the image.
+
 ## Repo
 
 - Remote: `git@github.com:mi-robotics/HumanoidsChallenge.git` (branch `main`).
