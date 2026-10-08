@@ -22,3 +22,8 @@ future==1.0.0
 matplotlib==3.10.9
 cloudpickle==3.1.2
 gym==0.26.2
+# Phase 3: CoTracker3 (RTX 5090 needs a CUDA 12.8 build):
+#   pip install torch==2.7.1 torchvision==0.22.1 --index-url https://download.pytorch.org/whl/cu128
+#   git clone https://github.com/facebookresearch/co-tracker third_party/co-tracker  (commit 82e02e8)
+#   pip install --no-deps -e third_party/co-tracker --config-settings editable_mode=compat
+#   checkpoint: https://huggingface.co/facebook/cotracker3/resolve/main/scaled_offline.pth -> third_party/cotracker_ckpt/

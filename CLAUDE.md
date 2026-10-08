@@ -35,6 +35,8 @@ simple sim (LIBERO / robosuite). Submitted as a public GitHub repo with a README
 - LIBERO is cloned (commit 8f1084e) into `third_party/` (gitignored) and installed with
   `pip install --no-deps -e third_party/LIBERO --config-settings editable_mode=compat`.
   Its pinned requirements are old, so we skip them; `requirements.txt` has what it actually needs.
+- CoTracker3 (offline, `scaled_offline.pth`) is cloned into `third_party/co-tracker` (commit 82e02e8) and installed
+  the same way; torch 2.7.1 + cu128 for the local RTX 5090. Install steps are in `requirements.txt`.
 - The env sets `LIBERO_CONFIG_PATH=third_party/libero_config` (absolute path) and `MUJOCO_GL=egl`
   via `conda env config vars`. Don't touch `~/.libero/`, which belongs to another env.
 

@@ -108,7 +108,7 @@ const PHASES = [
   { id: "p2", n: "2", name: "Live teleop", status: "dropped", goal: "Dropped after step 1.9: offline replay of recorded videos already puts the cup on the plate (5/5), so the dataset's sim actions come from replay instead of live teleop.",
     steps: [] },
   { id: "p3", n: "3", name: "Action flows", status: "active", goal: "Turn videos into point trails in one fixed format.",
-    steps: [["Define the flow format in flow/FORMAT.md ([points, T, 4], T = 16 at 10 Hz)", 1, "https://claude.ai/artifact/JmAsBvaDwyKcB7EieZRDDg"], ["Run CoTracker on recorded videos", 2], ["Convert trails to table coordinates", 0],
+    steps: [["Define the flow format in flow/FORMAT.md ([points, T, 4], T = 16 at 10 Hz)", 1, "https://claude.ai/artifact/JmAsBvaDwyKcB7EieZRDDg"], ["Run CoTracker on recorded videos", 1, "https://claude.ai/artifact/LaaJqCtvNkpkfA1HfNLd88"], ["Convert trails to table coordinates", 2],
       ["Track points on the cup (object flow)", 0], ["Write a visualiser that draws trails on the video", 0], ["Write the slicing function: episode → training samples", 0]] },
   { id: "p4", n: "4", name: "Data collection", status: "todo", goal: "Record 50–100 videos, replay each in sim, keep the episodes where the sim cup ends on the plate.",
     steps: [["Record episodes, cup and plate in a new grid position each time", 0], ["Run the Phase 1 pipeline on every episode", 0],
