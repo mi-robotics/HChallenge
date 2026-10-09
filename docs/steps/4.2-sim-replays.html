@@ -39,7 +39,7 @@ img.result { display: block; width: 100%; max-width: 100%; border-radius: 6px; b
 <main>
   <header>
     <span class="eyebrow">Step 4.2 · Phase 4</span>
-    <h1>Replaying 100 episodes in sim: 60 succeed</h1>
+    <h1>101 successful sim replays from 165 recordings</h1>
   </header>
 
   <figure>
@@ -47,6 +47,20 @@ img.result { display: block; width: 100%; max-width: 100%; border-radius: 6px; b
     <figcaption>Real | sim replay. Top two rows: successes. Bottom: two failures.</figcaption>
   </figure>
 
+  <div class="scroll">
+    <table>
+      <thead><tr><th>batch</th><th>how I grasped</th><th>recorded</th><th>kept</th></tr></thead>
+      <tbody>
+        <tr><th scope="row">1</th><td>pinch the rim from outside</td><td>100</td><td>60</td></tr>
+        <tr><th scope="row">2</th><td>index finger inside the mug</td><td>40</td><td>19</td></tr>
+        <tr><th scope="row">3–4</th><td>pinch the rim from outside</td><td>25</td><td>22</td></tr>
+        <tr><th scope="row">total</th><td></td><td>165</td><td>101 (61%)</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p style="font: 13px/1.5 var(--mono); color: var(--muted)">Batch 2: with the index finger inside the mug the thumb–index gap stays 3–5 cm while carrying, above the 3 cm "hand open" threshold, so the release fired 0.35–0.85 s after the grasp and the robot let go mid-carry. Batches 3–4: 2 of the 25 were not processed (MediaPipe hung) and are counted as dropped. Kept episodes: cup ends a median 0.8 cm, max 3.0 cm from the plate centre.</p>
+
+  <h2>Batch 1: what failed, and the approach fix</h2>
   <div class="scroll">
     <table>
       <thead><tr><th>outcome</th><th>approach descends within 3 cm (Phase 1)</th><th>within 1 cm (now)</th></tr></thead>
@@ -61,10 +75,10 @@ img.result { display: block; width: 100%; max-width: 100%; border-radius: 6px; b
       </tbody>
     </table>
   </div>
-  <p style="font: 13px/1.5 var(--mono); color: var(--muted)">The 5 Phase 1 demos still succeed 5/5 with 1 cm. Replaying the failures at half speed rescued 12/55, so speed is not the main cause. Kept episodes: cup ends 0.8 cm (median), max 3.0 cm from the plate centre. The 40 failures are moved to data/mug_pnp_failed, not deleted.</p>
+  <p style="font: 13px/1.5 var(--mono); color: var(--muted)">The 5 Phase 1 demos still succeed 5/5 with 1 cm. Replaying the failures at half speed rescued 12/55, so speed is not the main cause. Failures from all batches are moved to data/mug_pnp_failed, not deleted.</p>
 
   <ul class="files">
-    <li><a href="https://github.com/mi-robotics/HumanoidsChallenge/blob/main/replay/run_dataset.py" target="_blank" rel="noopener">replay/run_dataset.py</a><span>Phase 1 pipeline + sim replay on every episode, one process each; writes replay_summary.json</span></li>
+    <li><a href="https://github.com/mi-robotics/HumanoidsChallenge/blob/main/replay/run_dataset.py" target="_blank" rel="noopener">replay/run_dataset.py</a><span>Phase 1 pipeline + sim replay on every episode, one process each, 300 s timeout; writes replay_summary.json</span></li>
     <li><a href="https://github.com/mi-robotics/HumanoidsChallenge/blob/main/replay/replay.py" target="_blank" rel="noopener">replay/replay.py</a><span>Approach constraint: descend only within 1 cm of the grasp point (was 3 cm)</span></li>
     <li><a href="https://github.com/mi-robotics/HumanoidsChallenge/blob/main/media/phase4/task2/replays.mp4" target="_blank" rel="noopener">media/phase4/task2/replays.mp4</a><span>This video</span></li>
   </ul>
