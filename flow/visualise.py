@@ -28,6 +28,18 @@ LEGEND = [(BLUE, "wrist + knuckles", "dot"), (ORANGE, "thumb tip", "dot"), (GREE
           (YELLOW, "mug", "dot"), (RED, "hidden (interpolated)", "dot"), ((90, 90, 90), f"now; trail = next {T} steps", "ring")]
 
 
+def draw(img, uv, vis, colours, n_hand, scale=1.0):
+    """Draw one flow sample: uv [points, T, 2] pixels, vis [points, T]; mug points first so the hand is on top."""
+    line, dot, ring = max(1, round(3 * scale)), max(1, round(5 * scale)), max(3, round(10 * scale))
+    for p in list(range(n_hand, len(uv))) + list(range(n_hand)):
+        q = uv[p].astype(int)
+        for k in range(len(q) - 1):
+            cv2.line(img, tuple(q[k]), tuple(q[k + 1]), colours[p] if vis[p, k + 1] else RED, line, cv2.LINE_AA)
+        for k in range(len(q)):
+            cv2.circle(img, tuple(q[k]), dot, colours[p] if vis[p, k] else RED, -1, cv2.LINE_AA)
+        cv2.circle(img, tuple(q[0]), ring, (255, 255, 255), max(1, round(2 * scale)), cv2.LINE_AA)
+
+
 def visualise(demo):
     demo = Path(demo)
     meta = json.loads((demo / "meta.json").read_text())
@@ -51,14 +63,7 @@ def visualise(demo):
         img = img.copy()
         s = min(int(round(t_cam[i] * HZ)), N - 1)
         steps = np.minimum(np.arange(s, s + T), N - 1)  # past the end: last frame repeated (FORMAT.md)
-        for p in list(range(len(flow["hand"]), len(pts))) + list(range(len(flow["hand"]))):  # hand on top
-            q = uv[p, steps].astype(int)
-            vis = pts[p, steps, 3] > 0
-            for k in range(T - 1):
-                cv2.line(img, tuple(q[k]), tuple(q[k + 1]), colours[p] if vis[k + 1] else RED, 3, cv2.LINE_AA)
-            for k in range(T):
-                cv2.circle(img, tuple(q[k]), 5, colours[p] if vis[k] else RED, -1, cv2.LINE_AA)
-            cv2.circle(img, tuple(q[0]), 10, (255, 255, 255), 2, cv2.LINE_AA)
+        draw(img, uv[:, steps], pts[:, steps, 3] > 0, colours, len(flow["hand"]))
         cv2.putText(img, f"t = {t_cam[i]:.1f} s", (16, 44), cv2.FONT_HERSHEY_SIMPLEX, 1.2, (255, 255, 255), 3, cv2.LINE_AA)
         ff.stdin.write(img.tobytes())
     ff.stdin.close()

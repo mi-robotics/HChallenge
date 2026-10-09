@@ -28,7 +28,8 @@ thead th { font-weight: 500; color: var(--muted); }
 .notes li { min-width: 0; }
 h2 { font: 700 20px/1.25 var(--display); margin: 12px 0 0; }
 p { margin: 0; max-width: 68ch; }
-video { display: block; width: 100%; max-width: 100%; aspect-ratio: 8 / 3; border-radius: 6px; border: 1px solid var(--line); background: var(--surface); }
+video { display: block; width: 100%; max-width: 100%; aspect-ratio: 8 / 3; }
+video.sim { max-width: 40rem; margin-inline: auto; aspect-ratio: 966 / 1024; border-radius: 6px; border: 1px solid var(--line); background: var(--surface); }
 img.result { display: block; width: 100%; max-width: 100%; border-radius: 6px; border: 1px solid var(--line); background: var(--surface); }
 .files { list-style: none; margin: 0; padding: 0; display: grid; }
 .files li { display: grid; grid-template-columns: minmax(0, 13rem) 1fr; gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--line); }
@@ -48,6 +49,17 @@ img.result { display: block; width: 100%; max-width: 100%; border-radius: 6px; b
     <video src="media/phase4/task4/flows.mp4" controls autoplay muted loop playsinline aria-label="Four real recordings with the flow drawn on top: coloured trails show where the hand points and the mug points go over the next 1.5 seconds as the hand moves the white mug onto the saucer. Two are kept episodes, two failed in sim."></video>
     <figcaption>Real video with the flow sample starting at each frame drawn on top (next 16 steps at 10 Hz, 1.5 s). Top left and middle: kept episodes. Top right and bottom left: episodes whose sim replay failed.</figcaption>
   </figure>
+
+  <figure>
+    <video class="sim" src="media/phase4/task4/flows_sim.mp4" controls autoplay muted loop playsinline aria-label="Four kept episodes, one per row: the real video with the flow, the sim third-person view with the same flow drawn where the robot is, and the sim gripper camera. The hand trails run through the robot gripper as it carries the red mug to the plate."></video>
+    <figcaption>Kept episodes. Per row: real video + flow | sim third-person camera + the same flow moved into the sim world (+ sim_minus_real, step 4.3); white × = the robot's gripper point | sim gripper camera. Each sim step shows the flow sample at the real time it follows.</figcaption>
+  </figure>
+
+  <ul class="notes">
+    <li>The hand flow's pinch point (thumb–index midpoint), moved into the sim world, is within 2 mm (median; max 2.3 cm) of the target the robot was sent while carrying, over all 100 kept episodes: the flow is the robot's path.</li>
+    <li>The gripper trails that target by about 0.2 s (4 control steps): gripper vs the target at the same step, median 5.4 cm while carrying; with the 0.2 s lag removed, 1.0 cm (p90 3.0 cm).</li>
+    <li>The mug flow does not land on the sim cup (median 6.9 cm apart in xy at the start): the offset is set so the pinch lands on the sim grasp spot (cup centre + 4 cm in y), but I grasp the real mug at different spots around the rim (the 4.2 limitation).</li>
+  </ul>
 
   <div class="scroll">
     <table>
@@ -70,6 +82,8 @@ img.result { display: block; width: 100%; max-width: 100%; border-radius: 6px; b
     <li><a href="https://github.com/mi-robotics/HumanoidsChallenge/blob/main/flow/run_flows.py" target="_blank" rel="noopener">flow/run_flows.py</a><span>Runs mug masks → point tracking → flow → overlay on every episode; writes flow_summary.json and this video (--video)</span></li>
     <li><a href="https://github.com/mi-robotics/HumanoidsChallenge/blob/main/flow/mug_sam.py" target="_blank" rel="noopener">flow/mug_sam.py</a><span>Automatic SAM 2 mug mask and grasp / release timing from the mug's motion</span></li>
     <li><a href="https://github.com/mi-robotics/HumanoidsChallenge/blob/main/flow/format.py" target="_blank" rel="noopener">flow/format.py</a><span>hold_times: mug-motion timing used for the mug flow</span></li>
-    <li><a href="https://github.com/mi-robotics/HumanoidsChallenge/blob/main/media/phase4/task4/flows.mp4" target="_blank" rel="noopener">media/phase4/task4/flows.mp4</a><span>This video</span></li>
+    <li><a href="https://github.com/mi-robotics/HumanoidsChallenge/blob/main/replay/record_sim.py" target="_blank" rel="noopener">replay/record_sim.py</a><span>--video --flow: the flow-in-sim video, projected into the third-person camera</span></li>
+    <li><a href="https://github.com/mi-robotics/HumanoidsChallenge/blob/main/media/phase4/task4/flows_sim.mp4" target="_blank" rel="noopener">media/phase4/task4/flows_sim.mp4</a><span>Flow in sim video</span></li>
+    <li><a href="https://github.com/mi-robotics/HumanoidsChallenge/blob/main/media/phase4/task4/flows.mp4" target="_blank" rel="noopener">media/phase4/task4/flows.mp4</a><span>Flow on the real video</span></li>
   </ul>
 </main>

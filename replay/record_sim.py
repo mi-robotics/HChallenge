@@ -15,6 +15,8 @@ Same replay as step 4.2 (replay/replay.py, all rim-grasp constraints), with reco
                        to the hand flow puts the flow on the robot's path
   success, hz, sim_plate_xy
 --video renders, for the episodes given, the real video next to the two sim cameras, one row per episode.
+--flow (with --video) draws the action flow (flow.npz, step 4.4) on both: the real video uses flow_overlay.mp4, and
+the sim third-person view gets the same flow sample moved into the sim world by sim_minus_real.
 """
 import subprocess
 import sys
@@ -25,31 +27,57 @@ import numpy as np
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "replay"))
+sys.path.insert(0, str(ROOT / "flow"))
+sys.path.insert(0, str(ROOT / "sim"))
 from replay import HZ, make_env, replay  # noqa: E402
 
 IMG = 256  # env camera size: the third-person view is saved at this size, the gripper view at 128
 
 
-def render(episodes, out_path, cell=256):
+def project_third_person(pts, size=IMG):
+    """World points [..., 3] -> pixels [..., 2] in the third-person image (sim/scene.py THIRD_PERSON)."""
+    from scene import THIRD_PERSON, third_person_pose
+    pos, R = third_person_pose()
+    pc = (pts - pos) @ R
+    f = size / 2 / np.tan(np.radians(THIRD_PERSON["fovy_deg"]) / 2)
+    return f * pc[..., :2] / pc[..., 2:] + size / 2
+
+
+def render(episodes, out_path, cell=256, flow=False):
+    if flow:
+        from format import HZ as FLOW_HZ, T
+        from track_points import HAND_COLOUR, YELLOW
+        from visualise import draw
     rows = []
     for k, ep in enumerate(episodes):
         ep = Path(ep)
         sim = np.load(ep / "sim.npz")
         t_cam = np.loadtxt(ep / "frames.csv", delimiter=",", skiprows=1)[:, 2]
         t_cam = (t_cam - t_cam[0]) / 1000
-        cap, real = cv2.VideoCapture(str(ep / "color.mp4")), []
+        cap, real = cv2.VideoCapture(str(ep / ("flow_overlay.mp4" if flow else "color.mp4"))), []
         while True:
             ok, f = cap.read()
             if not ok:
                 break
             real.append(cv2.resize(f, (cell * 16 // 9 // 2 * 2, cell)))  # even width for H.264
+        if flow:
+            fl = np.load(ep / "flow.npz")
+            pts = np.concatenate([fl["hand"], fl["cup"]])  # [14, N, 4], table frame
+            uv = project_third_person(pts[..., :3] + sim["sim_minus_real"]) * cell / IMG
+            colours, n_hand, N = HAND_COLOUR + [YELLOW] * len(fl["cup"]), len(fl["hand"]), pts.shape[1]
         frames = []
         for i in range(len(sim["action"])):
             r = real[min(int(np.searchsorted(t_cam, sim["t_real"][i])), len(real) - 1)].copy()
             views = [cv2.resize(np.ascontiguousarray(sim[v][i][:, :, ::-1]), (cell, cell), interpolation=cv2.INTER_NEAREST)
                      for v in ("agentview", "eye_in_hand")]
-            for img, label in zip([r] + views, [f"episode {k + 1}: real", "sim: third person", "sim: gripper camera"]):
-                cv2.putText(img, label, (8, 22), cv2.FONT_HERSHEY_SIMPLEX, 0.55, (255, 255, 255), 2, cv2.LINE_AA)
+            if flow:
+                st = np.minimum(np.arange(T) + min(int(round(sim["t_real"][i] * FLOW_HZ)), N - 1), N - 1)
+                draw(views[0], uv[:, st], pts[:, st, 3] > 0, colours, n_hand, scale=0.4)
+                g = project_third_person(sim["eef_pos"][i]) * cell / IMG  # robot gripper (eef site): white x
+                cv2.drawMarker(views[0], tuple(int(v) for v in g), (255, 255, 255), cv2.MARKER_TILTED_CROSS, 12, 2)
+            for img, label in zip([r] + views, [f"episode {k + 1}: real", "sim: third person" + (" + flow" if flow else ""),
+                                                "sim: gripper camera"]):
+                cv2.putText(img, label, (8, cell - 10 if flow else 22), cv2.FONT_HERSHEY_SIMPLEX, 0.55, (255, 255, 255), 2, cv2.LINE_AA)
             frames.append(np.hstack([r] + views))
         rows.append(frames)
     n = max(len(f) for f in rows)
@@ -66,11 +94,17 @@ def render(episodes, out_path, cell=256):
 
 if __name__ == "__main__":
     args = sys.argv[1:]
-    video = None
+    video, flow = None, "--flow" in args
+    if flow:
+        args.remove("--flow")
     if "--video" in args:
         i = args.index("--video")
         video = Path(args[i + 1])
         del args[i:i + 2]
+    if video and flow:  # render only, from the saved sim.npz and flow.npz
+        video.parent.mkdir(parents=True, exist_ok=True)
+        render(args, video, flow=True)
+        sys.exit()
     episodes = args or sorted(str(p) for p in (ROOT / "data" / "mug_pnp_dataset").iterdir() if p.is_dir())
     env = make_env(img_size=IMG)
     results = [replay(ep, env, record=True) for ep in episodes]
