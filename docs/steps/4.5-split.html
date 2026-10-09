@@ -1,0 +1,79 @@
+<title>Step 4.5 · Dataset Split</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;700;800&family=JetBrains+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: single column. Title, the split plot, split table, notes, then the files */
+:root {
+  --bg: #f5f6f8; --surface: #ffffff; --fg: #1a1e26; --muted: #5d6573; --line: #dde1e8; --accent: #2d4fd0;
+  --display: "Archivo", "Helvetica Neue", Arial, sans-serif;
+  --mono: "JetBrains Mono", ui-monospace, Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #12151b; --surface: #1a1e26; --fg: #e6e9ef; --muted: #98a0ae; --line: #2c323d; --accent: #8aa2ff; color-scheme: dark } }
+:root[data-theme="dark"] {
+  --bg: #12151b; --surface: #1a1e26; --fg: #e6e9ef; --muted: #98a0ae; --line: #2c323d; --accent: #8aa2ff; color-scheme: dark }
+
+body { background: var(--bg); color: var(--fg); font: 15px/1.5 var(--display); padding-inline: 16px; padding-block: 40px 64px; }
+main { max-width: 56rem; margin: 0 auto; display: grid; gap: 28px; }
+.eyebrow { font: 500 12px/1 var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+h1 { font: 800 clamp(28px, 6vw, 38px)/1.1 var(--display); margin: 10px 0 0; text-wrap: balance; }
+pre { margin: 0; padding: 14px 16px; background: var(--surface); border: 1px solid var(--line); border-radius: 6px; font: 13.5px/1.6 var(--mono); overflow-x: auto; }
+figcaption { font: 13px/1.5 var(--mono); color: var(--muted); }
+figure { margin: 0; display: grid; gap: 8px; }
+.scroll { overflow-x: auto; }
+table { border-collapse: collapse; width: 100%; font: 13px/1.4 var(--mono); font-variant-numeric: tabular-nums; }
+th, td { text-align: left; padding: 8px 12px 8px 0; border-bottom: 1px solid var(--line); white-space: nowrap; }
+thead th { font-weight: 500; color: var(--muted); }
+.notes { margin: 0; padding-left: 1.2em; display: grid; gap: 8px; max-width: 72ch; }
+.notes li { min-width: 0; }
+h2 { font: 700 20px/1.25 var(--display); margin: 12px 0 0; }
+p { margin: 0; max-width: 68ch; }
+video { display: block; width: 100%; max-width: 40rem; margin-inline: auto; max-width: 100%; aspect-ratio: 966 / 1024; border-radius: 6px; border: 1px solid var(--line); background: var(--surface); }
+img.result { display: block; width: 100%; max-width: 100%; border-radius: 6px; border: 1px solid var(--line); background: var(--surface); }
+.files { list-style: none; margin: 0; padding: 0; display: grid; }
+.files li { display: grid; grid-template-columns: minmax(0, 13rem) 1fr; gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--line); }
+.files a { font: 13.5px var(--mono); color: var(--accent); overflow-wrap: anywhere; }
+.files a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.files span { color: var(--muted); }
+@media (max-width: 480px) { .files li { grid-template-columns: 1fr; gap: 2px; } }
+</style>
+
+<main>
+  <header>
+    <span class="eyebrow">Step 4.5 · Phase 4</span>
+    <h1>Split by episode, with one table region held out for testing</h1>
+  </header>
+
+  <figure>
+    <img class="result" src="media/phase4/task5/splits.png" alt="Top view of the table frame with one dot per episode at the cup's start position, coloured by split. Train, val and test dots fill y from -19 to -59 cm; the 14 test_novel dots all lie beyond the dashed line at y = -60 cm; failed episodes are hollow grey rings, many of them beyond the line too.">
+    <figcaption>Cup start position per episode (mean of the mug flow points at the first step), table frame. Dashed line: held-out region, y &lt; −60 cm.</figcaption>
+  </figure>
+
+  <div class="scroll">
+    <table>
+      <thead><tr><th>split</th><th>episodes</th><th>sim steps</th><th>cup y (cm)</th></tr></thead>
+      <tbody>
+        <tr><th scope="row">train</th><td>66</td><td>12,195</td><td>−57 … −19</td></tr>
+        <tr><th scope="row">val</th><td>10</td><td>1,792</td><td>−54 … −23</td></tr>
+        <tr><th scope="row">test</th><td>10</td><td>1,845</td><td>−59 … −25</td></tr>
+        <tr><th scope="row">test_novel</th><td>14</td><td>2,790</td><td>−84 … −61</td></tr>
+        <tr><th scope="row">failed, flow only</th><td>45</td><td>–</td><td>−56 … −13</td></tr>
+        <tr><th scope="row">failed in the held-out region (not for training)</th><td>18</td><td>–</td><td>−88 … −64</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <ul class="notes">
+    <li>train / val / test: the 86 kept episodes outside the region, shuffled with seed 0.</li>
+    <li>The held-out region is also where replays fail most: 18 of the 63 failed episodes vs 14 of the 100 kept. There the cup is 0.8–1 m from the camera, where D405 depth reads 2–4% short.</li>
+    <li>The sim cup always starts at one spot, so for the sim robot test_novel means new absolute flow positions and plate offsets, not a new cup spot in sim.</li>
+    <li>data/README.md: where the data lives (16 GB, not in git), every file and array in an episode folder, frames and clocks, why the 65 dropped episodes were dropped, how to regenerate.</li>
+  </ul>
+
+  <ul class="files">
+    <li><a href="https://github.com/mi-robotics/HumanoidsChallenge/blob/main/data/README.md" target="_blank" rel="noopener">data/README.md</a><span>Data locations, file structures, counts, splits</span></li>
+    <li><a href="https://github.com/mi-robotics/HumanoidsChallenge/blob/main/data/split.py" target="_blank" rel="noopener">data/split.py</a><span>Writes splits.json and this plot</span></li>
+    <li><a href="https://github.com/mi-robotics/HumanoidsChallenge/blob/main/data/splits.json" target="_blank" rel="noopener">data/splits.json</a><span>Episode lists per split</span></li>
+    <li><a href="https://github.com/mi-robotics/HumanoidsChallenge/blob/main/media/phase4/task5/splits.png" target="_blank" rel="noopener">media/phase4/task5/splits.png</a><span>This plot</span></li>
+  </ul>
+</main>

@@ -4,7 +4,10 @@ __pycache__/
 .DS_Store
 
 # Recorded data and large media stay out of git
-data/
+data/*
+!data/README.md
+!data/split.py
+!data/splits.json
 *.mp4
 *.mov
 *.hdf5
