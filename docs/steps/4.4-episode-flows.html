@@ -1,0 +1,75 @@
+<title>Step 4.4 · Episode Flows</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;700;800&family=JetBrains+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: single column. Title, the 4-episode flow video, counts table, notes, then the files */
+:root {
+  --bg: #f5f6f8; --surface: #ffffff; --fg: #1a1e26; --muted: #5d6573; --line: #dde1e8; --accent: #2d4fd0;
+  --display: "Archivo", "Helvetica Neue", Arial, sans-serif;
+  --mono: "JetBrains Mono", ui-monospace, Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #12151b; --surface: #1a1e26; --fg: #e6e9ef; --muted: #98a0ae; --line: #2c323d; --accent: #8aa2ff; color-scheme: dark } }
+:root[data-theme="dark"] {
+  --bg: #12151b; --surface: #1a1e26; --fg: #e6e9ef; --muted: #98a0ae; --line: #2c323d; --accent: #8aa2ff; color-scheme: dark }
+
+body { background: var(--bg); color: var(--fg); font: 15px/1.5 var(--display); padding-inline: 16px; padding-block: 40px 64px; }
+main { max-width: 56rem; margin: 0 auto; display: grid; gap: 28px; }
+.eyebrow { font: 500 12px/1 var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+h1 { font: 800 clamp(28px, 6vw, 38px)/1.1 var(--display); margin: 10px 0 0; text-wrap: balance; }
+pre { margin: 0; padding: 14px 16px; background: var(--surface); border: 1px solid var(--line); border-radius: 6px; font: 13.5px/1.6 var(--mono); overflow-x: auto; }
+figcaption { font: 13px/1.5 var(--mono); color: var(--muted); }
+figure { margin: 0; display: grid; gap: 8px; }
+.scroll { overflow-x: auto; }
+table { border-collapse: collapse; width: 100%; font: 13px/1.4 var(--mono); font-variant-numeric: tabular-nums; }
+th, td { text-align: left; padding: 8px 12px 8px 0; border-bottom: 1px solid var(--line); white-space: nowrap; }
+thead th { font-weight: 500; color: var(--muted); }
+.notes { margin: 0; padding-left: 1.2em; display: grid; gap: 8px; max-width: 72ch; }
+.notes li { min-width: 0; }
+h2 { font: 700 20px/1.25 var(--display); margin: 12px 0 0; }
+p { margin: 0; max-width: 68ch; }
+video { display: block; width: 100%; max-width: 100%; aspect-ratio: 8 / 3; border-radius: 6px; border: 1px solid var(--line); background: var(--surface); }
+img.result { display: block; width: 100%; max-width: 100%; border-radius: 6px; border: 1px solid var(--line); background: var(--surface); }
+.files { list-style: none; margin: 0; padding: 0; display: grid; }
+.files li { display: grid; grid-template-columns: minmax(0, 13rem) 1fr; gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--line); }
+.files a { font: 13.5px var(--mono); color: var(--accent); overflow-wrap: anywhere; }
+.files a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.files span { color: var(--muted); }
+@media (max-width: 480px) { .files li { grid-template-columns: 1fr; gap: 2px; } }
+</style>
+
+<main>
+  <header>
+    <span class="eyebrow">Step 4.4 · Phase 4</span>
+    <h1>Hand and mug flow for all 163 episodes, kept and failed</h1>
+  </header>
+
+  <figure>
+    <video src="media/phase4/task4/flows.mp4" controls autoplay muted loop playsinline aria-label="Four real recordings with the flow drawn on top: coloured trails show where the hand points and the mug points go over the next 1.5 seconds as the hand moves the white mug onto the saucer. Two are kept episodes, two failed in sim."></video>
+    <figcaption>Real video with the flow sample starting at each frame drawn on top (next 16 steps at 10 Hz, 1.5 s). Top left and middle: kept episodes. Top right and bottom left: episodes whose sim replay failed.</figcaption>
+  </figure>
+
+  <div class="scroll">
+    <table>
+      <thead><tr><th></th><th>episodes</th><th>flow steps</th><th>hand visible (median, min)</th><th>mug visible (median, min)</th></tr></thead>
+      <tbody>
+        <tr><th scope="row">kept</th><td>100</td><td>6,595</td><td>98%, 91%</td><td>89%, 40%</td></tr>
+        <tr><th scope="row">failed in sim</th><td>63 of 65</td><td>3,796</td><td>97%, 92%</td><td>85%, 32%</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <ul class="notes">
+    <li>The 2 failed episodes without flow have no hand track (MediaPipe hung on them in step 4.2).</li>
+    <li>The mug is now found automatically: SAM 2's mask generator on the first frame, filtered for mug-shaped masks, nearest the hand's first pinch (last frame in 3 episodes where the mug was not found in the first). Step 3.4 used a click.</li>
+    <li>Grasp and release times come from when the mug starts and stops moving, not from the hand, so failed episodes are timed right: 12 of them have no grasp from the hand track at all, and in others the hand events are off by up to 3.8 s. In kept episodes the mug starts moving a median 0.54 s after the pinch closes and stops 0.73 s before the hand opens.</li>
+    <li>Low mug visibility is the hand covering the mug while carrying; hidden points are interpolated and flagged (red in the video).</li>
+  </ul>
+
+  <ul class="files">
+    <li><a href="https://github.com/mi-robotics/HumanoidsChallenge/blob/main/flow/run_flows.py" target="_blank" rel="noopener">flow/run_flows.py</a><span>Runs mug masks → point tracking → flow → overlay on every episode; writes flow_summary.json and this video (--video)</span></li>
+    <li><a href="https://github.com/mi-robotics/HumanoidsChallenge/blob/main/flow/mug_sam.py" target="_blank" rel="noopener">flow/mug_sam.py</a><span>Automatic SAM 2 mug mask and grasp / release timing from the mug's motion</span></li>
+    <li><a href="https://github.com/mi-robotics/HumanoidsChallenge/blob/main/flow/format.py" target="_blank" rel="noopener">flow/format.py</a><span>hold_times: mug-motion timing used for the mug flow</span></li>
+    <li><a href="https://github.com/mi-robotics/HumanoidsChallenge/blob/main/media/phase4/task4/flows.mp4" target="_blank" rel="noopener">media/phase4/task4/flows.mp4</a><span>This video</span></li>
+  </ul>
+</main>

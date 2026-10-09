@@ -60,13 +60,22 @@ def from_mediapipe(demo, hz=HZ):
     return t.astype(DTYPE), flow, frame
 
 
+def hold_times(demo):
+    """(t_grasp, t_release) in seconds: when the mug starts and stops moving (SAM 2 mask, flow/mug_sam.py), else the
+    hand's grasp/release events (replay/retarget.py; the 5 Phase 1 demos)."""
+    m = np.load(demo / "mug_mask.npz") if (demo / "mug_mask.npz").exists() else {}
+    if "t_grasp" in m:
+        return float(m["t_grasp"]), float(m["t_release"])
+    rt = np.load(demo / "retarget.npz")
+    return float(rt["t"][int(rt["i_grasp"])]), float(rt["t"][int(rt["i_release"])])
+
+
 def cup_cylinder(demo, t, hand):
     """The stand-in mug as a vertical cylinder (radius CUP_R_M): axis xy [N, 2] and rim height [N] per step, plus
     (g, c) = grasp point and axis xy at the grasp. Still until the grasp, moves with the pinch point until the
     release, then stays (see module docstring)."""
-    rt = np.load(demo / "retarget.npz")
-    i_grasp = int(np.abs(t - rt["t"][int(rt["i_grasp"])]).argmin())
-    i_release = int(np.abs(t - rt["t"][int(rt["i_release"])]).argmin())
+    t_grasp, t_release = hold_times(demo)
+    i_grasp, i_release = int(np.abs(t - t_grasp).argmin()), int(np.abs(t - t_release).argmin())
     thumb, index = hand[1, i_grasp, :3], hand[2, i_grasp, :3]
     g = (thumb + index) / 2
     u = (index - thumb)[:2] / np.linalg.norm((index - thumb)[:2])
@@ -79,9 +88,8 @@ def cup_cylinder(demo, t, hand):
 def cup_from_hand(demo, t, hand):
     """Stand-in cup flow [8, N, 4] (see module docstring)."""
     _, _, g, c = cup_cylinder(demo, t, hand)
-    rt = np.load(demo / "retarget.npz")
-    i_grasp = int(np.abs(t - rt["t"][int(rt["i_grasp"])]).argmin())
-    i_release = int(np.abs(t - rt["t"][int(rt["i_release"])]).argmin())
+    t_grasp, t_release = hold_times(demo)
+    i_grasp, i_release = int(np.abs(t - t_grasp).argmin()), int(np.abs(t - t_release).argmin())
     to_cam = np.load(demo / "hand_table.npz")["cam_in_table"][:2] - c
     a = np.arctan2(to_cam[1], to_cam[0]) + np.radians([-60, -20, 20, 60])  # camera-facing half
     ring = np.c_[c[0] + CUP_R_M * np.cos(a), c[1] + CUP_R_M * np.sin(a)]

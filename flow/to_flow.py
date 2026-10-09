@@ -4,7 +4,8 @@
 
 Hand: tracked pixel + D405 depth at that pixel (median of a 7x7 patch), then the marker pose, as in step 1.5.
 Mug: tracked pixel (points from the SAM 2 mask, flow/track_points.py) + depth where the pixel's camera ray meets the
-stand-in mug, a 4 cm-radius vertical cylinder that moves with the CoTracker pinch point (flow/format.py cup_cylinder;
+stand-in mug, a 4 cm-radius vertical cylinder that moves with the CoTracker pinch point while the mug moves (timing from
+the SAM 2 mask since step 4.4, flow/format.py hold_times; flow/format.py cup_cylinder;
 the D405 has no depth on the white mug). Rays that miss the cylinder (e.g. on the handle) take the point of closest
 approach to its axis; rays that would meet it above the rim (mask points inside the mug, seen through the opening)
 take the point where they cross the rim plane. So the mug's image position comes from tracking and only its distance from the camera from the
@@ -31,7 +32,7 @@ import numpy as np
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "flow"))
 sys.path.insert(0, str(ROOT / "replay"))
-from format import CUP_R_M, DTYPE, HAND_POINTS, HZ, N_CUP_POINTS, check, cup_cylinder, fill_hidden  # noqa: E402
+from format import CUP_R_M, DTYPE, HAND_POINTS, HZ, N_CUP_POINTS, check, cup_cylinder, fill_hidden, hold_times  # noqa: E402
 from to_table import demo_marker_pose, pixels_to_table  # noqa: E402
 from track_hand import depth_at, depth_frames  # noqa: E402
 
@@ -104,7 +105,6 @@ def fill_rigid(p, v):
 
 def to_flow(demo):
     demo = Path(demo)
-    rt = np.load(demo / "retarget.npz")
     t_cam, hand_ct, hand3d, vis, (K, dist, R, tv, ct) = tracked_hand(demo)
     n = len(t_cam)
     cup3d = tracked_mug(demo, t_cam, hand_ct, K, dist, R, tv, ct)
@@ -138,7 +138,7 @@ def to_flow(demo):
     dev = np.linalg.norm(pinch - ref, axis=1)[both & ~filled]
     jitter = np.linalg.norm(np.diff(hand[:, :, :3], 2, axis=1), axis=2)[:, :][hand[:, 1:-1, 3] > 0]
     below = (hand[..., 2] < -0.01) & (hand[..., 3] > 0)
-    i_release = int(np.abs(t - rt["t"][int(rt["i_release"])]).argmin())
+    i_release = int(np.abs(t - hold_times(demo)[1]).argmin())
     cup_lift = cup[:, i_release, 2].mean() - cup[:, 0, 2].mean()
     gap = np.linalg.norm(pinch - ref, axis=1)[both & filled]
     print(f"{demo.name}: {len(t)} steps | hand visible {hand[..., 3].mean() * 100:.0f}%, mug {cup[..., 3].mean() * 100:.0f}% | "

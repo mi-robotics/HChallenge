@@ -42,7 +42,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "flow"))
 sys.path.insert(0, str(ROOT / "replay"))
 from format import HAND_MEDIAPIPE, HAND_POINTS  # noqa: E402
-from mug_sam import load_masks, mask_points  # noqa: E402
+from mug_sam import load_masks, mask_points, mug_frame  # noqa: E402
 from track_hand import depth_at, depth_frames  # noqa: E402
 from cotracker.predictor import CoTrackerPredictor  # noqa: E402
 
@@ -121,7 +121,8 @@ def track(demo, model):
 
     # Mug: points from the first-frame SAM 2 mask.
     masks = load_masks(demo)[:n]
-    ctracks, cvis = run_cotracker(model, frames, np.array([0]), mask_points(masks[0])[None])
+    fm = min(mug_frame(demo), n - 1)  # where SAM 2 found the mug (the last frame if the hand covered it at first)
+    ctracks, cvis = run_cotracker(model, frames, np.array([fm]), mask_points(masks[fm])[None])
     cup_uv, cup_co_vis = ctracks[:, 0], cvis[:, 0]
 
     # Occlusion from D405 depth at the tracked pixels.
@@ -207,12 +208,13 @@ def legend(path, w=640, h=360, rows=None):
     cv2.imwrite(str(path), img)
 
 
-def tile(videos, out_path, seconds, legend_rows=None):
+def tile(videos, out_path, seconds, legend_rows=None, labels=None):
     tw, th = 640, 360
     n = len(videos)
+    labels = labels or [f"demo {i + 1}" for i in range(n)]
     legend_png = out_path.parent / "legend.png"
     legend(legend_png, tw, th, legend_rows)
-    f = "".join(f"[{i}:v]scale={tw}:{th},drawtext=text='demo {i + 1}':x=10:y={th - 30}:fontsize=20:fontcolor=white:"
+    f = "".join(f"[{i}:v]scale={tw}:{th},drawtext=text='{labels[i]}':x=10:y={th - 30}:fontsize=20:fontcolor=white:"
                 f"box=1:boxcolor=black@0.5[v{i}];" for i in range(n))
     cells = [f"{(i % 3) * tw}_{(i // 3) * th}" for i in range(n + 1)]
     cmd = ["ffmpeg", "-y", "-loglevel", "error"]
@@ -220,7 +222,7 @@ def tile(videos, out_path, seconds, legend_rows=None):
         cmd += ["-i", str(v)]
     cmd += ["-loop", "1", "-framerate", "30", "-t", str(seconds), "-i", str(legend_png), "-filter_complex",
             f"{f}[{n}:v]format=yuv420p[v{n}];{''.join(f'[v{i}]' for i in range(n + 1))}"
-            f"xstack=inputs={n + 1}:layout={'|'.join(cells)}:shortest=0[out]",
+            f"xstack=inputs={n + 1}:layout={'|'.join(cells)}:shortest=0:fill=black[out]",
             "-map", "[out]", "-c:v", "libx264", "-crf", "26", "-pix_fmt", "yuv420p", str(out_path)]
     subprocess.run(cmd, check=True)
     legend_png.unlink()
