@@ -71,7 +71,7 @@ simple sim (LIBERO / robosuite). Submitted as a public GitHub repo with a README
 - MediaPipe hand landmarker model: `third_party/mediapipe/hand_landmarker.task` (float16/1, downloaded).
   On this camera the moving right hand is labelled "Right" (not mirrored); the left hand rests on the keyboard.
 - Current demos (new setup, marker x away from camera): data/demos/20261008_1844*–1845*. Old setup demos in data/demos_old/ (not used).
-- Phase 4 dataset episodes go to data/episodes/ (`python replay/record.py data/episodes`); the 5 demos in data/demos are not part of the dataset (plate always in one place).
+- Phase 4 dataset episodes go to data/mug_pnp_dataset/ (`python replay/record.py data/mug_pnp_dataset`); the 5 demos in data/demos are not part of the dataset (plate always in one place).
 
 ## Repo
 

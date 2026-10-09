@@ -1,6 +1,6 @@
 """Record demos with the D405.
 
-  python replay/record.py [out_dir]     (default: data/demos; Phase 4 episodes: data/episodes)
+  python replay/record.py [out_dir]     (default: data/demos; Phase 4 episodes: data/mug_pnp_dataset)
       s = start recording, e = end recording (saves one demo), x = discard the current recording, q = quit
 
 Each demo is saved to <out_dir>/<YYYYmmdd_HHMMSS>/:
