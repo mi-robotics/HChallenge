@@ -179,6 +179,10 @@ Dropped after step 1.9. Offline replay of a recorded video already gets the sim 
 - [ ] Kept episodes have sim actions, state, images and flow saved in one format
 - [ ] `data/README.md` with counts and the split
 
+### Notes
+
+- **4.1** `python replay/record.py data/mug_pnp_dataset` (recorder now takes the output folder; `x` discards a take). 100 episodes, 9.8 min, 4.4–9.9 s each (median 5.7 s; the Phase 1 demos were 10–11 s, so about twice as fast). 1 dropped frame in total, marker found in every first frame, 7.5 GB. Cup and saucer moved every episode. The 5 Phase 1 demos are not in the dataset (saucer always in one place).
+
 ### Watch out for
 
 - Vary lighting and positions a bit; too-similar episodes make models look better than they are.
