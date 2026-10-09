@@ -1,15 +1,16 @@
 """Record demos with the D405.
 
-  python replay/record.py
-      s = start recording, e = end recording (saves one demo), q = quit
+  python replay/record.py [out_dir]     (default: data/demos; Phase 4 episodes: data/episodes)
+      s = start recording, e = end recording (saves one demo), x = discard the current recording, q = quit
 
-Each demo is saved to data/demos/<YYYYmmdd_HHMMSS>/:
+Each demo is saved to <out_dir>/<YYYYmmdd_HHMMSS>/:
   color.mp4     H.264, near-lossless (crf 12), 30 fps
   depth.mkv     raw uint16 depth aligned to colour, lossless (FFV1); x depth_scale = metres
   frames.csv    frame index, camera frame number, camera timestamp (ms)
   meta.json     intrinsics, depth_scale, instruction, frame count, dropped frames
 """
 import json
+import shutil
 import subprocess
 import sys
 import time
@@ -36,8 +37,8 @@ def ffmpeg_writer(path, size, pix_fmt_in, codec_args):
 
 
 class Recording:
-    def __init__(self, cam):
-        self.dir = DEMOS / time.strftime("%Y%m%d_%H%M%S")
+    def __init__(self, cam, out_dir):
+        self.dir = out_dir / time.strftime("%Y%m%d_%H%M%S")
         self.dir.mkdir(parents=True)
         self.cam = cam
         self.color = ffmpeg_writer(self.dir / "color.mp4", cam.size, "bgr24",
@@ -76,11 +77,20 @@ class Recording:
         print(f"saved {self.dir.name}: {meta['frames']} frames, {meta['duration_s']} s, "
               f"{dropped} dropped")
 
+    def discard(self):
+        for p in (self.color, self.depth):
+            p.stdin.close()
+            p.wait()
+        shutil.rmtree(self.dir)
+        print("discarded", self.dir.name)
 
-def main():
+
+def main(out_dir):
+    count = lambda: sum(1 for p in out_dir.iterdir() if p.is_dir()) if out_dir.exists() else 0
+    n_saved = count()
     cam = D405()
     rec, marker_ok, i = None, False, 0
-    print("s = start, e = end, q = quit")
+    print(f"saving to {out_dir} ({n_saved} already there). s = start, e = end, x = discard, q = quit")
     try:
         while True:
             color, depth, ts, fn = cam.read_raw()
@@ -95,19 +105,22 @@ def main():
                         cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 200, 0) if marker_ok else (0, 0, 255), 2, cv2.LINE_AA)
             if rec:
                 cv2.circle(vis, (vis.shape[1] - 25, 22), 9, (0, 0, 255), -1)
-                cv2.putText(vis, f"REC {time.time() - rec.t_start:4.1f} s  (e = end)", (vis.shape[1] - 230, 28),
+                cv2.putText(vis, f"REC {time.time() - rec.t_start:4.1f} s  (e = end, x = discard)", (vis.shape[1] - 330, 28),
                             cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 0, 255), 2, cv2.LINE_AA)
             else:
-                cv2.putText(vis, "s = start   q = quit", (10, vis.shape[0] - 12),
+                cv2.putText(vis, f"{n_saved} saved in {out_dir.name}   s = start   q = quit", (10, vis.shape[0] - 12),
                             cv2.FONT_HERSHEY_SIMPLEX, 0.55, (255, 255, 255), 2, cv2.LINE_AA)
             cv2.imshow("record demo", vis)
 
             key = cv2.waitKey(1) & 0xFF
             if key == ord("s") and rec is None:
-                rec = Recording(cam)
+                rec = Recording(cam, out_dir)
                 print("recording", rec.dir.name)
             elif key == ord("e") and rec is not None:
                 rec.close()
+                rec, n_saved = None, count()
+            elif key == ord("x") and rec is not None:
+                rec.discard()
                 rec = None
             elif key == ord("q"):
                 break
@@ -119,4 +132,4 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    main(Path(sys.argv[1]).resolve() if len(sys.argv) > 1 else DEMOS)
