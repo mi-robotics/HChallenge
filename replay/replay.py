@@ -11,7 +11,8 @@ Rim-grasp constraints (default: all three; --raw replays the hand path as is; --
 the mug, while I pinch it from the side, so following the hand exactly knocks the mug over on approach and
 drags it off the plate after release. Three local changes, the hand path is kept everywhere else:
   approach  before the grasp, the target stays >= 8 cm above the grasp point until the gripper itself (not the
-            target: the arm lags fast hand motion) is within 3 cm of it horizontally, then descends
+            target: the arm lags fast hand motion) is within 1 cm of it horizontally, then descends
+            (3 cm until step 4.2: with the cup in a new place every episode, a 1-3 cm offset put the finger on the rim)
   settle    at the grasp point: 0.5 s with fingers open (arrive), then 0.5 s closing (grip), then follow the hand
   lift out  after release, hold 0.25 s, then rise 10 cm straight up before following the hand again
 
@@ -35,7 +36,7 @@ MEDIA = ROOT / "media" / "phase1" / "task9"
 HZ = 20
 W, H = 640, 360
 CONSTRAINTS = ("approach", "settle", "lift")
-CLEAR_M, NEAR_M, ARRIVE_S, GRIP_S, LIFT_M, OPEN_HOLD_S = 0.08, 0.03, 0.5, 0.5, 0.10, 0.25
+CLEAR_M, NEAR_M, ARRIVE_S, GRIP_S, LIFT_M, OPEN_HOLD_S = 0.08, 0.01, 0.5, 0.5, 0.10, 0.25
 
 
 def approach_clearance(eef, grasp):
