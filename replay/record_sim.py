@@ -7,7 +7,7 @@ Same replay as step 4.2 (replay/replay.py, all rim-grasp constraints), with reco
   joint_pos, joint_vel [N,7], gripper_qpos [N,2]          proprioception, observed before the action
   eef_pos [N,3], eef_quat [N,4]                           end-effector pose (world frame)
   cup_pos, cup_quat, plate_pos                            object state
-  agentview [N,128,128,3], eye_in_hand [N,128,128,3]      third-person (sim/scene.py THIRD_PERSON: moved back and up
+  agentview [N,256,256,3], eye_in_hand [N,128,128,3]      third-person (sim/scene.py THIRD_PERSON: moved back and up
                                                           so the whole workspace is in view) and gripper camera, uint8 RGB
   t_real [N]           time in the real video of the hand sample each step follows (s); the inserted settle /
                        lift-out steps and the final 1 s hold the time, so steps are not evenly spaced in t_real
@@ -27,7 +27,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "replay"))
 from replay import HZ, make_env, replay  # noqa: E402
 
-IMG = 128
+IMG = 256  # env camera size: the third-person view is saved at this size, the gripper view at 128
 
 
 def render(episodes, out_path, cell=256):

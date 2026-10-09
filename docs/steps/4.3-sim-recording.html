@@ -40,13 +40,13 @@ img.result { display: block; width: 100%; max-width: 100%; border-radius: 6px; b
 
 <main>
   <header>
-    <span class="eyebrow">Step 4.3 · Phase 4 · test on 4 episodes</span>
-    <h1>What the sim robot did and saw, saved per step</h1>
+    <span class="eyebrow">Step 4.3 · Phase 4</span>
+    <h1>100 episodes: what the sim robot did and saw, saved per step</h1>
   </header>
 
   <figure>
     <video src="media/phase4/task3/sim_views.mp4" controls autoplay muted loop playsinline aria-label="Four rows, one per episode: the real recording, the sim third-person camera and the sim gripper camera, in sync; the sim robot picks up the red mug and puts it on the plate."></video>
-    <figcaption>Per row: real video | sim third-person camera | sim gripper camera (128 × 128, shown 2×), at the 20 Hz control rate. The real frame shown is the one each sim step follows; it holds during the inserted settle and lift-out steps.</figcaption>
+    <figcaption>Per row: real video | sim third-person camera | sim gripper camera (256 × 256 and 128 × 128), at the 20 Hz control rate. The real frame shown is the one each sim step follows; it holds during the inserted settle and lift-out steps.</figcaption>
   </figure>
 
   <div class="scroll">
@@ -58,7 +58,7 @@ img.result { display: block; width: 100%; max-width: 100%; border-radius: 6px; b
         <tr><th scope="row">gripper finger position</th><td>[N, 2]</td></tr>
         <tr><th scope="row">end-effector position, orientation (quaternion)</th><td>[N, 3], [N, 4]</td></tr>
         <tr><th scope="row">cup position + orientation, plate position</th><td>[N, 3], [N, 4], [N, 3]</td></tr>
-        <tr><th scope="row">third-person camera, gripper camera (RGB)</th><td>[N, 128, 128, 3] each</td></tr>
+        <tr><th scope="row">third-person camera, gripper camera (RGB)</th><td>[N, 256, 256, 3], [N, 128, 128, 3]</td></tr>
         <tr><th scope="row">time in the real video each step follows</th><td>[N]</td></tr>
         <tr><th scope="row">offset table frame → sim world (to put the flow on the robot's path)</th><td>[3]</td></tr>
       </tbody>
@@ -66,9 +66,9 @@ img.result { display: block; width: 100%; max-width: 100%; border-radius: 6px; b
   </div>
 
   <ul class="notes">
-    <li>4/4 succeed, as in step 4.2. Observations are taken before each action.</li>
-    <li>156–254 steps per episode: the sim runs 2.7–2.8 s longer than the real video (inserted settle and lift-out steps, plus 1 s at the end for the cup to settle).</li>
-    <li>11 MB per episode, about 1.1 GB for all 101.</li>
+    <li>All 101 kept episodes replayed with recording on: 100 succeed. 20261009_112930 failed this time (cup 1.5 cm from the plate centre, a borderline set-down that passed in step 4.2) and was moved to the failed episodes. Observations are taken before each action.</li>
+    <li>18,622 steps in total, 142–265 per episode (median 177, 8.9 s): the sim runs about 2.8 s longer than the real video (inserted settle and lift-out steps, plus 1 s at the end for the cup to settle).</li>
+    <li>2.0 GB for the 100 episodes (about 20 MB each).</li>
     <li>Third-person camera: LIBERO's agentview moved back and up (50° above the table, 1.7 m from the workspace centre, fixed for every episode) so all recorded plate positions (sim x −0.42…0.18 m, y −0.53…0.55 m) stay in view; with the default camera the plate left the image (episode 2). The top of the arm is cut off; gripper, mug and plate are always visible.</li>
   </ul>
 

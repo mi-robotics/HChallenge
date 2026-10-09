@@ -36,6 +36,7 @@ MEDIA = ROOT / "media" / "phase1" / "task9"
 HZ = 20
 W, H = 640, 360
 CONSTRAINTS = ("approach", "settle", "lift")
+EYE_IN_HAND_PX = 128  # the third-person camera is saved at the env's size (256); the gripper camera at 128
 CLEAR_M, NEAR_M, ARRIVE_S, GRIP_S, LIFT_M, OPEN_HOLD_S = 0.08, 0.01, 0.5, 0.5, 0.10, 0.25
 
 
@@ -81,7 +82,9 @@ def snapshot(obs):
             "joint_vel": obs["robot0_joint_vel"], "gripper_qpos": obs["robot0_gripper_qpos"],
             "eef_pos": obs["robot0_eef_pos"], "eef_quat": obs["robot0_eef_quat"],
             "cup_pos": obs[f"{CUP}_pos"], "cup_quat": obs[f"{CUP}_quat"], "plate_pos": obs[f"{PLATE}_pos"],
-            "agentview": obs["agentview_image"][::-1], "eye_in_hand": obs["robot0_eye_in_hand_image"][::-1]}
+            "agentview": obs["agentview_image"][::-1],
+            "eye_in_hand": cv2.resize(obs["robot0_eye_in_hand_image"][::-1], (EYE_IN_HAND_PX, EYE_IN_HAND_PX),
+                                      interpolation=cv2.INTER_AREA)}
 
 
 def replay(demo, env, use=CONSTRAINTS, record=False):
