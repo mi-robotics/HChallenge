@@ -190,6 +190,8 @@ Dropped after step 1.9. Offline replay of a recorded video already gets the sim 
 - Back up the raw videos; everything else can be regenerated from them.
 - `scene_match.py` puts the sim cup at one fixed spot and only the cup → plate offset follows the real scene. If varied absolute positions matter for Phase 5, place the sim cup at the real cup's table position instead.
 - Keeping only successful replays filters on the hand-designed constraints too; report the kept fraction.
+- **Limitation (accepted for now): the robot always grasps the same spot on the rim.** The replay anchors the hand path so the moment I close lands on the sim rim-grasp point (cup centre + 4 cm in y, fixed because the fingers close along world y), so where I grasp around the rim is not copied. It does not cause failures (none of the 40 in step 4.2). A fix would take the grasp angle around the mug (mug centre from the SAM mask) and rotate the gripper yaw to match; the replay is position-only today.
+- Same anchoring, matters for Phase 5: the sim cup always starts at one spot, but the flow is in real table coordinates, so a flow points to where the real cup was. Before Phase 5: place the sim cup at the real cup's position, or give the policy the flow relative to the cup.
 
 ---
 
