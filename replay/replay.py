@@ -30,7 +30,7 @@ import numpy as np
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "sim"))
 sys.path.insert(0, str(ROOT / "replay"))
-from scene import CLOSE, CUP, OPEN, make_env, move_to, place, render, reset, set_camera, step_towards  # noqa: E402
+from scene import CLOSE, CUP, OPEN, PLATE, make_env, move_to, place, render, reset, set_camera, step_towards  # noqa: E402
 
 MEDIA = ROOT / "media" / "phase1" / "task9"
 HZ = 20
@@ -75,7 +75,18 @@ def tag(use):
     return "" if set(use) == set(CONSTRAINTS) else "_raw" if not use else "_" + "+".join(use)
 
 
-def replay(demo, env, use=CONSTRAINTS):
+def snapshot(obs):
+    """What step 4.3 saves per control step, observed before the action (images turned right way up)."""
+    return {"joint_pos": np.arctan2(obs["robot0_joint_pos_sin"], obs["robot0_joint_pos_cos"]),
+            "joint_vel": obs["robot0_joint_vel"], "gripper_qpos": obs["robot0_gripper_qpos"],
+            "eef_pos": obs["robot0_eef_pos"], "eef_quat": obs["robot0_eef_quat"],
+            "cup_pos": obs[f"{CUP}_pos"], "cup_quat": obs[f"{CUP}_quat"], "plate_pos": obs[f"{PLATE}_pos"],
+            "agentview": obs["agentview_image"][::-1], "eye_in_hand": obs["robot0_eye_in_hand_image"][::-1]}
+
+
+def replay(demo, env, use=CONSTRAINTS, record=False):
+    """record: also save sim.npz (per control step: observation before the action, the action, real time of the
+    hand sample it came from) for the dataset (step 4.3); needs an env with camera images."""
     demo = Path(demo)
     rt = np.load(demo / "retarget.npz")
     sc = json.loads((demo / "scene.json").read_text())
@@ -99,11 +110,16 @@ def replay(demo, env, use=CONSTRAINTS):
         start[2] = max(start[2], grasp_point[2] + CLEAR_M)
     obs, pre_steps, _ = move_to(env, obs, start, gripper=OPEN, max_steps=150)
     sim_frames, err, cup_z, tgts, eefs, cups = [], [], [], [], [], []
+    steps, actions = [], []
     for k in range(len(targets)):
         tgt = targets[k].copy()
         if approach[k]:
             tgt[2] = max(tgt[2], approach_clearance(obs["robot0_eef_pos"], grasp_point))
-        obs, *_ = env.step(step_towards(obs, tgt, gripper[k]))
+        action = step_towards(obs, tgt, gripper[k])
+        if record:
+            steps.append(snapshot(obs))
+            actions.append(action)
+        obs, *_ = env.step(action)
         err.append(np.linalg.norm(obs["robot0_eef_pos"] - tgt))
         tgts.append(tgt)
         eefs.append(obs["robot0_eef_pos"].copy())
@@ -111,7 +127,11 @@ def replay(demo, env, use=CONSTRAINTS):
         cup_z.append(obs[f"{CUP}_pos"][2] - table_z)
         sim_frames.append(render(env, cam["name"], W, H))
     for _ in range(HZ):  # let the cup settle
-        obs, *_ = env.step(np.r_[np.zeros(6), gripper[-1]])
+        action = np.r_[np.zeros(6), gripper[-1]]
+        if record:
+            steps.append(snapshot(obs))
+            actions.append(action)
+        obs, *_ = env.step(action)
         sim_frames.append(render(env, cam["name"], W, H))
     success = bool(env.check_success())
 
@@ -135,6 +155,12 @@ def replay(demo, env, use=CONSTRAINTS):
           f"{result['cup_max_lift_cm']:.1f} cm (hand {result['hand_max_lift_cm']:.1f}) | cup ends "
           f"{result['cup_final_xy_to_plate_cm']:.1f} cm from plate centre")
     write_side_by_side(demo, rt["t"][src], sim_frames, success, f"replay{tag(use)}.mp4")
+    if record:
+        t_real = np.r_[rt["t"][src], np.full(HZ, rt["t"][src][-1])]  # settle steps hold the last hand sample's time
+        np.savez_compressed(demo / "sim.npz", action=np.array(actions, np.float32), t_real=t_real.astype(np.float32),
+                            hz=HZ, success=success, sim_plate_xy=np.array(sc["sim_plate_xy"]),
+                            sim_minus_real=np.array(sc["sim_grasp_point"]) - rt["real_grasp"],
+                            **{k: np.array([s[k] for s in steps]) for k in steps[0]})
     return result
 
 
