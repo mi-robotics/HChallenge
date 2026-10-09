@@ -3,7 +3,7 @@
   python data/split.py
 
 Cup position = mean xy of the 8 mug flow points at step 0 (flow.npz, table frame). Kept episodes with the cup more
-than 60 cm to the right of the marker (y < -0.60 m) form test_novel: a table region no training episode starts in.
+than 61.3 cm to the right of the marker (y < -0.613 m; 10 episodes) form test_novel: a table region no training episode starts in.
 The other kept episodes are shuffled (seed 0) into val (10), test (10) and train (the rest). Failed episodes (no sim
 actions, flow only) are listed apart; the ones in the held-out region go to failed_novel and must not be trained on.
 Also writes media/phase4/task5/splits.png (top view of the cup positions by split).
@@ -15,7 +15,7 @@ import numpy as np
 
 DATA = Path(__file__).resolve().parent
 MEDIA = DATA.parent / "media" / "phase4" / "task5"
-NOVEL_Y_M = -0.60
+NOVEL_Y_M = -0.613
 N_VAL = N_TEST = 10
 SEED = 0
 
@@ -50,7 +50,7 @@ def plot(splits):
         ax.scatter(xy[:, 1], xy[:, 0], s=34, label=label, facecolor=colour if filled else "none",
                    edgecolor="white" if filled else colour, linewidth=1.2 if not filled else 0.8, zorder=3 if filled else 2)
     ax.scatter([0], [0], marker="s", s=60, color=ink, zorder=4, label="marker (origin)")
-    ax.text(NOVEL_Y_M * 100 - 1, 8, "held out: y < -60 cm", color=muted, fontsize=8, ha="left")
+    ax.text(NOVEL_Y_M * 100 - 1, 8, "held out: y < -61.3 cm", color=muted, fontsize=8, ha="left")
     ax.invert_xaxis()
     ax.set_aspect("equal", adjustable="datalim")
     ax.set_xlabel("y, cm (left +)", color=muted, fontsize=9)

@@ -42,20 +42,20 @@ release threshold, so the robot let go mid-carry. Details per batch: `PROJECT_PL
 
 Split by episode. Cup position = mean xy of the 8 mug flow points at the first step (table frame).
 
-| split | episodes | sim steps | cup x (cm) | cup y (cm) |
-|---|---|---|---|---|
-| train | 66 | 12,195 | −35 … 5 | −57 … −19 |
-| val | 10 | 1,792 | −33 … 1 | −54 … −23 |
-| test | 10 | 1,845 | −33 … 1 | −59 … −25 |
-| test_novel | 14 | 2,790 | −31 … −1 | −84 … −61 |
-| failed (flow only) | 45 | – | −32 … 5 | −56 … −13 |
-| failed_novel (flow only) | 18 | – | −36 … −2 | −88 … −64 |
+| split | episodes | sim steps | cup y (cm) |
+|---|---|---|---|
+| train | 70 | 12,845 | −61 … −19 |
+| val | 10 | 1,938 | −57 … −23 |
+| test | 10 | 1,854 | −59 … −20 |
+| test_novel | 10 | 1,985 | −84 … −61 |
+| failed (flow only) | 45 | – | −56 … −13 |
+| failed_novel (flow only) | 18 | – | −88 … −64 |
 
-- `test_novel`: every kept episode with the cup more than 60 cm to the right of the marker (y < −0.60 m). No
-  train/val/test episode starts there. The rest are shuffled with seed 0.
+- `test_novel`: the 10 kept episodes with the cup furthest to the right of the marker (y < −0.613 m). No
+  train/val/test episode starts there, but the boundary is tight: the nearest train episode is 2 mm inside it. The rest are shuffled with seed 0.
 - `failed` episodes have flow but no sim actions; they can add flow-only training data (e.g. Phase 6).
   `failed_novel` are in the held-out region and must not be trained on.
-- The far-right region fails more often: 18 of the 63 failed episodes with flow are there, vs 14 of the 100 kept
+- The far-right region fails more often: 18 of the 63 failed episodes with flow are there, vs 10 of the 100 kept
   (the cup is 0.8–1 m from the camera there, where D405 depth reads 2–4% short).
 - In sim the cup always starts at the same spot (−0.11, 0) and only the plate moves (cup + the real cup→plate
   offset), so for the sim robot `test_novel` means new absolute flow positions and plate offsets, not a new cup spot.

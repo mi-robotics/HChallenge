@@ -45,18 +45,18 @@ img.result { display: block; width: 100%; max-width: 100%; border-radius: 6px; b
   </header>
 
   <figure>
-    <img class="result" src="media/phase4/task5/splits.png" alt="Top view of the table frame with one dot per episode at the cup's start position, coloured by split. Train, val and test dots fill y from -19 to -59 cm; the 14 test_novel dots all lie beyond the dashed line at y = -60 cm; failed episodes are hollow grey rings, many of them beyond the line too.">
-    <figcaption>Cup start position per episode (mean of the mug flow points at the first step), table frame. Dashed line: held-out region, y &lt; −60 cm.</figcaption>
+    <img class="result" src="media/phase4/task5/splits.png" alt="Top view of the table frame with one dot per episode at the cup's start position, coloured by split. Train, val and test dots fill y from -19 to -59 cm; the 10 test_novel dots all lie beyond the dashed line at y = -61.3 cm; failed episodes are hollow grey rings, many of them beyond the line too.">
+    <figcaption>Cup start position per episode (mean of the mug flow points at the first step), table frame. Dashed line: held-out region, y &lt; −61.3 cm.</figcaption>
   </figure>
 
   <div class="scroll">
     <table>
       <thead><tr><th>split</th><th>episodes</th><th>sim steps</th><th>cup y (cm)</th></tr></thead>
       <tbody>
-        <tr><th scope="row">train</th><td>66</td><td>12,195</td><td>−57 … −19</td></tr>
-        <tr><th scope="row">val</th><td>10</td><td>1,792</td><td>−54 … −23</td></tr>
-        <tr><th scope="row">test</th><td>10</td><td>1,845</td><td>−59 … −25</td></tr>
-        <tr><th scope="row">test_novel</th><td>14</td><td>2,790</td><td>−84 … −61</td></tr>
+        <tr><th scope="row">train</th><td>70</td><td>12,845</td><td>−61 … −19</td></tr>
+        <tr><th scope="row">val</th><td>10</td><td>1,938</td><td>−57 … −23</td></tr>
+        <tr><th scope="row">test</th><td>10</td><td>1,854</td><td>−59 … −20</td></tr>
+        <tr><th scope="row">test_novel</th><td>10</td><td>1,985</td><td>−84 … −61</td></tr>
         <tr><th scope="row">failed, flow only</th><td>45</td><td>–</td><td>−56 … −13</td></tr>
         <tr><th scope="row">failed in the held-out region (not for training)</th><td>18</td><td>–</td><td>−88 … −64</td></tr>
       </tbody>
@@ -64,8 +64,8 @@ img.result { display: block; width: 100%; max-width: 100%; border-radius: 6px; b
   </div>
 
   <ul class="notes">
-    <li>train / val / test: the 86 kept episodes outside the region, shuffled with seed 0.</li>
-    <li>The held-out region is also where replays fail most: 18 of the 63 failed episodes vs 14 of the 100 kept. There the cup is 0.8–1 m from the camera, where D405 depth reads 2–4% short.</li>
+    <li>test_novel: the 10 kept episodes with the cup furthest right. The line is tight: the nearest train episode is 2 mm inside it. train / val / test: the other 90, shuffled with seed 0.</li>
+    <li>The held-out region is also where replays fail most: 18 of the 63 failed episodes vs 10 of the 100 kept. There the cup is 0.8–1 m from the camera, where D405 depth reads 2–4% short.</li>
     <li>The sim cup always starts at one spot, so for the sim robot test_novel means new absolute flow positions and plate offsets, not a new cup spot in sim.</li>
     <li>data/README.md: where the data lives (16 GB, not in git), every file and array in an episode folder, frames and clocks, why the 65 dropped episodes were dropped, how to regenerate.</li>
   </ul>
