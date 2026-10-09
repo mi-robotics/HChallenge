@@ -27,6 +27,8 @@ from scene_match import match  # noqa: E402
 from to_table import convert  # noqa: E402
 from track_hand import track  # noqa: E402
 
+TIMEOUT_S = 300
+
 STAGES = [("track_hand", "hand.npz", lambda d, env: track(d)),
           ("to_table", "hand_table.npz", lambda d, env: convert(d)),
           ("clean", "traj.npz", lambda d, env: clean(d)),
@@ -65,9 +67,12 @@ if __name__ == "__main__":
     episodes = sorted(p for p in dataset.iterdir() if p.is_dir())
     rows, t0 = [], time.time()
     for k, ep in enumerate(episodes):
-        out = subprocess.run([sys.executable, __file__, "--episode", str(ep)], capture_output=True, text=True)
         try:
+            out = subprocess.run([sys.executable, __file__, "--episode", str(ep)], capture_output=True, text=True,
+                                 timeout=TIMEOUT_S)
             rows.append(json.loads(out.stdout.strip().splitlines()[-1]))
+        except subprocess.TimeoutExpired:  # one MediaPipe run hung (2% CPU) in step 4.2
+            rows.append({"episode": ep.name, "stage": "crashed", "error": f"timeout after {TIMEOUT_S} s"})
         except (IndexError, json.JSONDecodeError):
             rows.append({"episode": ep.name, "stage": "crashed", "error": f"exit {out.returncode}: {out.stderr[-300:]}"})
         ok = sum(r.get("success", False) for r in rows)
