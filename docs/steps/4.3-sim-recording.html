@@ -69,7 +69,7 @@ img.result { display: block; width: 100%; max-width: 100%; border-radius: 6px; b
     <li>4/4 succeed, as in step 4.2. Observations are taken before each action.</li>
     <li>156–254 steps per episode: the sim runs 2.7–2.8 s longer than the real video (inserted settle and lift-out steps, plus 1 s at the end for the cup to settle).</li>
     <li>11 MB per episode, about 1.1 GB for all 101.</li>
-    <li>The third-person camera is LIBERO's fixed agentview. The plate is near or past the edge of its view when it is far to the side (episode 2).</li>
+    <li>Third-person camera: LIBERO's agentview moved back and up (50° above the table, 1.7 m from the workspace centre, fixed for every episode) so all recorded plate positions (sim x −0.42…0.18 m, y −0.53…0.55 m) stay in view; with the default camera the plate left the image (episode 2). The top of the arm is cut off; gripper, mug and plate are always visible.</li>
   </ul>
 
   <ul class="files">

@@ -30,7 +30,7 @@ import numpy as np
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "sim"))
 sys.path.insert(0, str(ROOT / "replay"))
-from scene import CLOSE, CUP, OPEN, PLATE, make_env, move_to, place, render, reset, set_camera, step_towards  # noqa: E402
+from scene import CLOSE, CUP, OPEN, PLATE, make_env, move_to, place, render, reset, set_camera, set_third_person_camera, step_towards  # noqa: E402
 
 MEDIA = ROOT / "media" / "phase1" / "task9"
 HZ = 20
@@ -103,6 +103,8 @@ def replay(demo, env, use=CONSTRAINTS, record=False):
         targets, gripper, src, approach = rim_grasp_constraints(targets, gripper, i_grasp, i_release, use)
     cam = sc["sim_camera"]
     set_camera(env, cam["name"], np.array(cam["pos"]), np.array(cam["R_world_from_cv"]), cam["fovy_deg"])
+    if record:
+        set_third_person_camera(env)
     table_z = obs[f"{CUP}_pos"][2]
 
     start = targets[0].copy()
