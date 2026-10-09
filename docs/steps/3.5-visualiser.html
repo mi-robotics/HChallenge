@@ -27,6 +27,10 @@ img.result { display: block; width: 100%; max-width: 100%; border-radius: 6px; b
 .files a { font: 13.5px var(--mono); color: var(--accent); overflow-wrap: anywhere; }
 .files a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .files span { color: var(--muted); }
+h2 { font: 700 20px/1.25 var(--display); margin: 0; }
+.notes { margin: 0; padding-left: 1.2em; display: grid; gap: 8px; max-width: 72ch; }
+.notes li { min-width: 0; }
+.notes b { font-weight: 700; }
 @media (max-width: 480px) { .files li { grid-template-columns: 1fr; gap: 2px; } }
 </style>
 
@@ -40,6 +44,20 @@ img.result { display: block; width: 100%; max-width: 100%; border-radius: 6px; b
     <video src="media/phase3/task5/flow.mp4" controls autoplay muted loop playsinline aria-label="Five demo videos tiled with a legend; at every frame the next 1.5 seconds of motion of the hand points and mug points are drawn as trails, with hidden steps in red."></video>
     <figcaption>At every frame: the flow sample that starts there, the next 16 steps (1.5 s) of the 6 hand and 8 mug points. Red = hidden steps (interpolated).</figcaption>
   </figure>
+
+  <h2>How the flow is made: the non-obvious choices</h2>
+  <ul class="notes">
+    <li><b>Table-frame metres, not pixels.</b> Points are in the ArUco marker's frame, the same frame the sim uses, so a flow can drive the robot without knowing the camera.</li>
+    <li><b>6 hand points, not 21.</b> Thumb and index tips give the pinch (where the grasp is, and whether it is closed); wrist and 3 knuckles give the hand's orientation.</li>
+    <li><b>16 steps at 10 Hz (1.5 s ahead).</b> At the fastest hand speed (p95 0.39 m/s) a step is about 4 cm. Past the episode end the last step repeats.</li>
+    <li><b>Pixels from CoTracker, not MediaPipe.</b> CoTracker covers MediaPipe's gaps (demo 5 has a 0.7 s gap where the hand swings about 10 cm). It is queried every 0.5 s from MediaPipe and each frame uses the nearest query: one query per video let the pinky knuckle drift 287 px.</li>
+    <li><b>Hand depth from the D405, at the tracked pixel.</b> The step 1.6 pinch path agrees within a median 1–2 mm.</li>
+    <li><b>Hidden needs a depth check.</b> CoTracker's "visible" says whether the pixel is visible, not the finger. MediaPipe's 3D hand, fitted to the D405 points, gives each point's expected depth. A point is hidden if something is more than 3 cm in front of it, it is more than 5 cm behind (off the hand), it has no depth, or it is within 10 px of the image edge.</li>
+    <li><b>Mug points come from a SAM 2 mask.</b> SAM 2 segments the mug in every frame from one click; 8 points are spread over the first-frame mask. A mug point is hidden when CoTracker hides it or it leaves the mask. Points placed from the hand started off the mug in demo 4.</li>
+    <li><b>Mug depth comes from the hand, not the camera.</b> The white mug gives no D405 depth. Each mug pixel's camera ray is met with a 4 cm-radius cylinder that moves with the pinch point, capped at the rim. Fitting the mug pose from its 8 points (PnP) drifted up to 11 cm along the line of sight during the carry, so it is only a check.</li>
+    <li><b>Each step averages ±50 ms.</b> A step is the mean of the visible camera frames within 50 ms. Taking the nearest frame gave about twice the jitter.</li>
+    <li><b>Filling hidden steps.</b> Hidden steps are filled only to avoid NaNs and keep visible = 0, so a model can mask them. Hand points are interpolated linearly. Mug points move with the visible mug points instead: linear filling drew them up to 32 cm off the mug.</li>
+  </ul>
 
   <ul class="files">
     <li><a href="https://github.com/mi-robotics/HumanoidsChallenge/blob/main/flow/visualise.py" target="_blank" rel="noopener">flow/visualise.py</a><span>Draws flow.npz on the video; writes this video</span></li>
