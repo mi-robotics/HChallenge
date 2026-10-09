@@ -4,7 +4,8 @@
   python flow/run_flows.py --video out.mp4 <episode> ...   tile the episodes' flow_overlay.mp4 with a legend
 
 Per episode with a hand track (hand.npz): SAM 2 mug masks and timing (flow/mug_sam.py) -> CoTracker hand and mug
-points (flow/track_points.py) -> flow.npz (flow/to_flow.py) -> flow_overlay.mp4 (flow/visualise.py). A stage whose
+points (flow/track_points.py) -> flow.npz (flow/to_flow.py) -> flow_overlay.mp4 (flow/visualise.py) -> for kept
+episodes with sim.npz (step 4.3), flow_sim.npz on the robot's clock (flow/sim_clock.py). A stage whose
 output exists is skipped; an episode that raises is recorded with the stage and error and the run goes on.
 Writes <dataset>/flow_summary.json.
 """
@@ -20,6 +21,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "flow"))
 from cotracker.predictor import CoTrackerPredictor  # noqa: E402
 from mug_sam import load_models, segment  # noqa: E402
+from sim_clock import to_sim_clock  # noqa: E402
 from to_flow import to_flow  # noqa: E402
 from track_points import CHECKPOINT, tile, track  # noqa: E402
 from visualise import LEGEND, visualise  # noqa: E402
@@ -39,7 +41,10 @@ def run(ep, models):
               ("to_flow", lambda e: (e / "flow.npz").exists() and (e / "flow.npz").stat().st_mtime > (e / "cotracker.npz").stat().st_mtime,
                lambda: to_flow(ep)),
               ("visualise", lambda e: (e / "flow_overlay.mp4").exists() and (e / "flow_overlay.mp4").stat().st_mtime > (e / "flow.npz").stat().st_mtime,
-               lambda: visualise(ep))]
+               lambda: visualise(ep)),
+              ("sim_clock", lambda e: not (e / "sim.npz").exists() or (e / "flow_sim.npz").exists()
+               and (e / "flow_sim.npz").stat().st_mtime > max((e / f).stat().st_mtime for f in ("flow.npz", "sim.npz")),
+               lambda: to_sim_clock(ep))]
     for name, done, fn in stages:
         row["stage"] = name
         if done(ep):
