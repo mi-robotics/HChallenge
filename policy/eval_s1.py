@@ -10,8 +10,8 @@ then the policy runs: predict a 32-step chunk from the two cameras + state (--de
 then LIBERO's On(cup, plate) decides success. Every (split, seed, episode) is one run; seed s sets the flow-matching
 noise (torch seed 1000 * s + episode index), the sim itself is deterministic. Runs are spread over --workers
 processes, each with its own model and env. Per split: success rate per seed, then mean +- std over the seeds.
-A flow checkpoint (--flow hand in training) gets, at every prediction at step i, the episode's recorded hand flow
-from flow_sim.npz rows i, i+2, .., i+30 (last row repeated past the end), indexed by sim time, not by progress.
+A flow checkpoint (--flow hand / full in training) gets, at every prediction at step i, the episode's recorded flow
+(hand, or hand + mug) from flow_sim.npz rows i, i+2, .., i+30 (last row repeated past the end), indexed by sim time, not by progress.
 Trail error (every model): median distance from the gripper to the flow's pinch point (thumb / index tip midpoint,
 in the sim world) at the same step, over the recorded length; for the recorded replay itself it is printed as
 "replay" (the gripper lags the target by ~0.2 s, step 4.4).
@@ -33,7 +33,7 @@ sys.path.insert(0, str(ROOT / "policy"))
 sys.path.insert(0, str(ROOT / "replay"))
 sys.path.insert(0, str(ROOT / "sim"))
 from s1_model import S1Config, S1Model  # noqa: E402
-from train_s1 import episode_dirs, flow_features  # noqa: E402
+from train_s1 import FLOW_POINTS, episode_dirs, flow_features  # noqa: E402
 from replay import HZ, snapshot  # noqa: E402
 from scene import OPEN, make_env, move_to, place, reset, set_camera, set_third_person_camera  # noqa: E402
 
@@ -58,7 +58,8 @@ def run_episode(env, ep, model, norm, ck, execute, denoise, dev, frames=None):
     sim = np.load(ep / "sim.npz")
     pinch, eef = pinch_sim(ep, sim), []
     if ck.get("flow"):
-        hand = torch.from_numpy(np.load(ep / "flow_sim.npz")["hand"].transpose(1, 0, 2)).to(dev)
+        fl = np.load(ep / "flow_sim.npz")
+        pts = torch.from_numpy(np.concatenate([fl["hand"], fl["cup"]]).transpose(1, 0, 2)).to(dev)
         smr = torch.from_numpy(sim["sim_minus_real"].astype(np.float32)).to(dev)[None]
     sc = json.loads((ep / "scene.json").read_text())
     reset(env)
@@ -79,8 +80,9 @@ def run_episode(env, ep, model, norm, ck, execute, denoise, dev, frames=None):
             state = ((raw - norm["state_mean"]) / norm["state_std"])[None]
             flow = None
             if ck.get("flow"):
-                rows = torch.clamp(i + torch.arange(0, model.cfg.flow_steps * 2, 2, device=dev), max=len(hand) - 1)[None]
-                flow = (flow_features(hand, rows, smr, raw[None, :3]) - norm["flow_mean"]) / norm["flow_std"]
+                rows = torch.clamp(i + torch.arange(0, model.cfg.flow_steps * 2, 2, device=dev), max=len(pts) - 1)[None]
+                flow = (flow_features(pts, rows, smr, raw[None, :3], FLOW_POINTS[ck["flow"]]) - norm["flow_mean"]) \
+                    / norm["flow_std"]
             with torch.autocast("cuda", dtype=torch.bfloat16):
                 chunk = model.sample(images, state, num_steps=denoise, flow=flow)[0].float()
             chunk = (chunk * norm["action_std"] + norm["action_mean"]).cpu().numpy()

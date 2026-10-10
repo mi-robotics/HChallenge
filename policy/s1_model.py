@@ -14,6 +14,7 @@ so there is no inference delay to train for), saliency, checkpoint feature contr
 with the ImageNet mean / std DINOv2 was trained with (HVLA feeds [0, 1] pixels).
 Added (both off by default, so the image-only checkpoints load unchanged):
   flow_dim > 0     flow_steps tokens, one per future flow step, each a linear projection of that step's flow_dim values
+  n_cameras = 0    no image tokens and no DINOv2 (state / flow only)
   obs_pos_embed    a learned embedding per context-token position, added before the obs encoder (HVLA has none, so
                    the encoder could not tell the two cameras apart except by content, nor order the flow steps)
 """
@@ -67,8 +68,9 @@ class S1Model(nn.Module):
         super().__init__()
         self.cfg = cfg
         d = cfg.hidden_dim
-        self.backbone = torch.hub.load("facebookresearch/dinov2", cfg.dino_model)
-        self.image_proj = nn.Linear(cfg.backbone_dim, d)
+        if cfg.n_cameras:
+            self.backbone = torch.hub.load("facebookresearch/dinov2", cfg.dino_model)
+            self.image_proj = nn.Linear(cfg.backbone_dim, d)
         self.state_proj = nn.Linear(cfg.state_dim, d)
         if cfg.flow_dim:
             self.flow_proj = nn.Linear(cfg.flow_dim, d)
@@ -99,15 +101,16 @@ class S1Model(nn.Module):
     def encode(self, images, state, flow=None):
         """images: list of [B, H, W, 3] uint8; state: [B, state_dim]; flow: [B, flow_steps, flow_dim] (normalised)
         -> context [B, N_ctx, D]."""
-        B = state.shape[0]
-        x = self.preprocess(images)
-        if self.training:
-            patches = torch.utils.checkpoint.checkpoint(
-                lambda y: self.backbone.forward_features(y)["x_norm_patchtokens"], x, use_reentrant=False)
-        else:
-            patches = self.backbone.forward_features(x)["x_norm_patchtokens"]
-        patches = self.image_proj(patches)  # [n_cams * B, P, D]
-        tokens = list(patches.reshape(len(images), B, *patches.shape[1:]))
+        B, tokens = state.shape[0], []
+        if self.cfg.n_cameras:
+            x = self.preprocess(images)
+            if self.training:
+                patches = torch.utils.checkpoint.checkpoint(
+                    lambda y: self.backbone.forward_features(y)["x_norm_patchtokens"], x, use_reentrant=False)
+            else:
+                patches = self.backbone.forward_features(x)["x_norm_patchtokens"]
+            patches = self.image_proj(patches)  # [n_cams * B, P, D]
+            tokens = list(patches.reshape(len(images), B, *patches.shape[1:]))
         tokens.append(self.state_proj(state).unsqueeze(1))
         if self.cfg.flow_dim:
             tokens.append(self.flow_proj(flow))
