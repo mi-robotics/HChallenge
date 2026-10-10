@@ -81,7 +81,8 @@ def run_episode(env, ep, model, norm, ck, execute, denoise, dev, frames=None):
             flow = None
             if ck.get("flow"):
                 rows = torch.clamp(i + torch.arange(0, model.cfg.flow_steps * 2, 2, device=dev), max=len(pts) - 1)[None]
-                flow = (flow_features(pts, rows, smr, raw[None, :3], FLOW_POINTS[ck["flow"]]) - norm["flow_mean"]) \
+                rel = raw[None, :3] if ck.get("flow_frame", "eef") == "eef" else torch.zeros_like(raw[None, :3])
+                flow = (flow_features(pts, rows, smr, rel, FLOW_POINTS[ck["flow"]]) - norm["flow_mean"]) \
                     / norm["flow_std"]
             with torch.autocast("cuda", dtype=torch.bfloat16):
                 chunk = model.sample(images, state, num_steps=denoise, flow=flow)[0].float()

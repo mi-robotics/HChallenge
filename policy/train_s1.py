@@ -1,7 +1,8 @@
 """Train S1: sim cameras + robot state (+ action flow with --flow) -> action chunk (flow matching).
 
   python policy/train_s1.py [--steps 20000] [--batch 64] [--cameras agentview eye_in_hand] [--img-aug]
-                            [--flow hand|full] [--obs-pos-embed] [--out outputs/s1/<name>]
+                            [--flow hand|full] [--flow-frame eef|world] [--flow-drop 0.2] [--obs-pos-embed]
+                            [--no-img-pos-embed] [--out outputs/s1/<name>]
 
 Data: the train split of data/splits.json (kept episodes), from sim.npz, held on the GPU (uint8 images: 80 episodes
 x ~185 steps x 2 cameras x 256 x 256 x 3 = 5.8 GB). One sample = the observation at step i and actions i .. i+31,
@@ -13,7 +14,8 @@ padded (and masked out of the loss) past the episode end.
   flow     flow_sim.npz rows i, i+2, .., i+30 (16 steps at 10 Hz = the 1.6 s of the action chunk, last row repeated
            past the episode end) of the 6 hand points (--flow hand) or hand + 8 mug points (--flow full), each
            (x, y, z, visible); xyz moved into the sim world by sim.npz sim_minus_real and taken relative to the
-           current eef_pos -> 16 tokens of 24 / 56 values
+           current eef_pos (--flow-frame eef, default) or left in the sim world (--flow-frame world: the robot base
+           frame up to a constant offset, which the z-scoring removes) -> 16 tokens of 24 / 56 values
 State, actions and flow xyz are z-scored with train-split statistics (visible stays 0 / 1). --img-aug applies LeRobot's default image transforms
 (lerobot/datasets/transforms.py ImageTransformsConfig, off by default there; HVLA's S1 training uses none) to each
 training image independently: 3 of {brightness 0.8-1.2, contrast 0.8-1.2, saturation 0.5-1.5, hue +-0.05,
@@ -158,14 +160,15 @@ def flow_rows(idx, end, chunk):
     return torch.minimum(idx[:, None] + torch.arange(0, chunk, 2, device=idx.device), end[idx][:, None] - 1)
 
 
-def batch(data, idx, chunk, norm, flow_kind=None):
+def batch(data, idx, chunk, norm, flow_kind=None, flow_frame="eef"):
     imgs, state, action, end, pts, smr = data
     steps = idx[:, None] + torch.arange(chunk, device=idx.device)
     pad = steps >= end[idx][:, None]
     steps = torch.minimum(steps, end[idx][:, None] - 1)
     flow = None
     if flow_kind:
-        flow = (flow_features(pts, flow_rows(idx, end, chunk), smr[idx], state[idx, :3], FLOW_POINTS[flow_kind])
+        eef = state[idx, :3] if flow_frame == "eef" else torch.zeros_like(state[idx, :3])
+        flow = (flow_features(pts, flow_rows(idx, end, chunk), smr[idx], eef, FLOW_POINTS[flow_kind])
                 - norm["flow_mean"]) / norm["flow_std"]
     return ([v[idx] for v in imgs.values()], (state[idx] - norm["state_mean"]) / norm["state_std"],
             (action[steps] - norm["action_mean"]) / norm["action_std"], pad, flow)
@@ -186,7 +189,10 @@ def main():
     ap.add_argument("--img-aug", action="store_true")
     ap.add_argument("--cameras", nargs="*", default=list(CAMERAS), choices=CAMERAS)
     ap.add_argument("--flow", choices=list(FLOW_POINTS))
+    ap.add_argument("--flow-frame", choices=["eef", "world"], default="eef")
+    ap.add_argument("--flow-drop", type=float, default=0.0)
     ap.add_argument("--obs-pos-embed", action="store_true")
+    ap.add_argument("--no-img-pos-embed", action="store_true")
     args = ap.parse_args()
     args.out.mkdir(parents=True, exist_ok=True)
     log = open(args.out / "train.log", "a")
@@ -206,7 +212,8 @@ def main():
             "action_mean": train[2].mean(0), "action_std": train[2].std(0).clamp(min=1e-3)}
     if args.flow:
         idx = torch.arange(len(train[1]), device=dev)
-        f = flow_features(train[4], flow_rows(idx, train[3], args.chunk), train[5], train[1][:, :3],
+        eef = train[1][:, :3] if args.flow_frame == "eef" else torch.zeros_like(train[1][:, :3])
+        f = flow_features(train[4], flow_rows(idx, train[3], args.chunk), train[5], eef,
                           FLOW_POINTS[args.flow]).flatten(0, 1)
         visible = torch.arange(f.shape[1], device=dev) % 4 == 3
         norm["flow_mean"] = torch.where(visible, 0.0, f.mean(0))
@@ -215,7 +222,8 @@ def main():
         f"GPU memory {torch.cuda.memory_allocated() / 1e9:.1f} GB")
 
     cfg = S1Config(action_dim=len(ACTION_DIMS), state_dim=train[1].shape[1], n_cameras=len(cameras), chunk_size=args.chunk,
-                   flow_dim=4 * FLOW_POINTS[args.flow] if args.flow else 0, flow_steps=args.chunk // 2, obs_pos_embed=args.obs_pos_embed)
+                   flow_dim=4 * FLOW_POINTS[args.flow] if args.flow else 0, flow_steps=args.chunk // 2, obs_pos_embed=args.obs_pos_embed,
+                   img_pos_embed=not args.no_img_pos_embed, flow_token_drop=args.flow_drop)
     model = S1Model(cfg).to(dev)
     say(f"parameters: {sum(p.numel() for p in model.parameters()) / 1e6:.1f} M; args {vars(args)}")
     opt = torch.optim.AdamW(model.parameters(), lr=args.lr, weight_decay=1e-4)
@@ -233,14 +241,14 @@ def main():
         model.eval()
         torch.manual_seed(0)  # same noise and flow times each time
         with torch.no_grad(), torch.autocast("cuda", dtype=torch.bfloat16):
-            losses = [model(*batch(val, val_idx[i:i + args.batch], args.chunk, norm, args.flow)).item()
+            losses = [model(*batch(val, val_idx[i:i + args.batch], args.chunk, norm, args.flow, args.flow_frame)).item()
                       for i in range(0, len(val_idx), args.batch)]
         model.train()
         return float(np.mean(losses))
 
     def save(name, step):
         torch.save({"model": model.state_dict(), "config": cfg.to_dict(), "norm": {k: v.cpu() for k, v in norm.items()},
-                    "step": step, "img_aug": args.img_aug, "flow": args.flow, "cameras": cameras, "state_keys": STATE_KEYS, "action_dims": ACTION_DIMS},
+                    "step": step, "img_aug": args.img_aug, "flow": args.flow, "flow_frame": args.flow_frame, "cameras": cameras, "state_keys": STATE_KEYS, "action_dims": ACTION_DIMS},
                    args.out / name)
 
     model.train()
@@ -249,7 +257,7 @@ def main():
         for group in opt.param_groups:
             group["lr"] = lr_at(step)
         idx = torch.randint(0, len(train[1]), (args.batch,), device=dev)
-        images, state, actions, pad, flow = batch(train, idx, args.chunk, norm, args.flow)
+        images, state, actions, pad, flow = batch(train, idx, args.chunk, norm, args.flow, args.flow_frame)
         if args.img_aug and cameras:
             images = augment(images)
         with torch.autocast("cuda", dtype=torch.bfloat16):

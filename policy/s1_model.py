@@ -17,6 +17,8 @@ Added (both off by default, so the image-only checkpoints load unchanged):
   n_cameras = 0    no image tokens and no DINOv2 (state / flow only)
   obs_pos_embed    a learned embedding per context-token position, added before the obs encoder (HVLA has none, so
                    the encoder could not tell the two cameras apart except by content, nor order the flow steps)
+  img_pos_embed    False: that embedding only on the state and flow tokens, not the image patches
+  flow_token_drop  training only: each flow token is replaced by a learned mask token with this probability
 """
 import math
 from dataclasses import asdict, dataclass
@@ -52,6 +54,8 @@ class S1Config:
     flow_dim: int = 0
     flow_steps: int = 16
     obs_pos_embed: bool = False
+    img_pos_embed: bool = True
+    flow_token_drop: float = 0.0
 
     def to_dict(self):
         return asdict(self)
@@ -74,6 +78,8 @@ class S1Model(nn.Module):
         self.state_proj = nn.Linear(cfg.state_dim, d)
         if cfg.flow_dim:
             self.flow_proj = nn.Linear(cfg.flow_dim, d)
+            if cfg.flow_token_drop:
+                self.flow_mask_token = nn.Parameter(torch.zeros(d))
         if cfg.obs_pos_embed:
             n_ctx = cfg.n_cameras * (cfg.image_size // 14) ** 2 + 1 + (cfg.flow_steps if cfg.flow_dim else 0)
             self.obs_pos_embed = nn.Embedding(n_ctx, d)
@@ -113,10 +119,19 @@ class S1Model(nn.Module):
             tokens = list(patches.reshape(len(images), B, *patches.shape[1:]))
         tokens.append(self.state_proj(state).unsqueeze(1))
         if self.cfg.flow_dim:
-            tokens.append(self.flow_proj(flow))
+            f = self.flow_proj(flow)
+            if self.training and self.cfg.flow_token_drop:
+                drop = torch.rand(f.shape[:2], device=f.device) < self.cfg.flow_token_drop
+                f = torch.where(drop.unsqueeze(-1), self.flow_mask_token.to(f.dtype), f)
+            tokens.append(f)
         x = torch.cat(tokens, dim=1)
         if self.cfg.obs_pos_embed:
-            x = x + self.obs_pos_embed.weight.unsqueeze(0)
+            pe = self.obs_pos_embed.weight
+            if self.cfg.img_pos_embed:
+                x = x + pe.unsqueeze(0)
+            else:
+                n_img = x.shape[1] - (1 + (self.cfg.flow_steps if self.cfg.flow_dim else 0))
+                x = torch.cat([x[:, :n_img], x[:, n_img:] + pe[n_img:].unsqueeze(0)], dim=1)
         return self.obs_encoder(x)
 
     def denoise_step(self, x_t, context, t):
