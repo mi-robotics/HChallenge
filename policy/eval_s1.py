@@ -1,21 +1,22 @@
 """Closed-loop evaluation of an S1 checkpoint in LIBERO, on the scenes of the dataset's episodes.
 
-  python policy/eval_s1.py <ckpt.pt> [--splits train val test failed] [--seeds 0 1 2 3 4] [--workers 6]
+  python policy/eval_s1.py <ckpt.pt> [--splits train val test failed] [--seeds 0 1 2 3 4] [--attempts 1] [--workers 6]
                            [--execute 10] [--denoise 10] [--video out.mp4] [--video-episodes 10]
 
 Per episode: the scene that episode was recorded in (sim cup and plate from scene.json, cameras as in step 4.3), the
 gripper driven to where the recorded episode started (sim.npz eef_pos[0], fingers open; the replay starts there too),
 then the policy runs: predict a 32-step chunk from the two cameras + state (--denoise Euler steps), execute the first
 --execute actions, repeat. The episode gets the recorded length + 3 s, then 1 s of zero actions for the cup to settle,
-then LIBERO's On(cup, plate) decides success. Every (split, seed, episode) is one run; seed s sets the flow-matching
-noise (torch seed 1000 * s + episode index), the sim itself is deterministic. Runs are spread over --workers
-processes, each with its own model and env. Per split: success rate per seed, then mean +- std over the seeds.
+then LIBERO's On(cup, plate) decides success. Every (split, seed, attempt, episode) is one run; seed s, attempt a set
+the flow-matching noise (torch seed 1000 * s + episode index + 1e6 * a, so attempt 0 is the 1-attempt eval), the sim
+itself is deterministic. Runs are spread over --workers processes, each with its own model and env. Per split:
+success rate per seed (over its episodes x attempts), then mean +- std over the seeds.
 A flow checkpoint (--flow hand / full in training) gets, at every prediction at step i, the episode's recorded flow
 (hand, or hand + mug) from flow_sim.npz rows i, i+2, .., i+30 (last row repeated past the end), indexed by sim time, not by progress.
 Trail error (every model): median distance from the gripper to the flow's pinch point (thumb / index tip midpoint,
 in the sim world) at the same step, over the recorded length; for the recorded replay itself it is printed as
 "replay" (the gripper lags the target by ~0.2 s, step 4.4).
-Writes <ckpt dir>/eval_<ckpt name>.json; --video tiles the third-person view of the first --video-episodes test
+Writes <ckpt dir>/eval_<ckpt name>.json (eval_<ckpt name>_x<attempts>.json for --attempts > 1); --video tiles the third-person view of the first --video-episodes test
 episodes, seed 0.
 """
 import argparse
@@ -111,13 +112,13 @@ def worker(ckpt, execute, denoise, jobs, results, video_dir):
         job = jobs.get()
         if job is None:
             break
-        split, seed, k, ep, keep_frames = job
+        split, seed, attempt, k, ep, keep_frames = job
         frames = [] if keep_frames else None
-        torch.manual_seed(1000 * seed + k)
+        torch.manual_seed(1000 * seed + k + 1_000_000 * attempt)
         ok, trail = run_episode(env, Path(ep), model, norm, ck, execute, denoise, dev, frames)
         if frames is not None:
             np.save(video_dir / f"{k:02d}_{Path(ep).name}.npy", np.stack(frames))
-        results.put((split, seed, Path(ep).name, ok, trail))
+        results.put((split, seed, attempt, Path(ep).name, ok, trail))
     env.close()
 
 
@@ -127,6 +128,7 @@ def main():
     ap.add_argument("ckpt", type=Path)
     ap.add_argument("--splits", nargs="+", default=["train", "val", "test", "failed"])
     ap.add_argument("--seeds", nargs="+", type=int, default=[0, 1, 2, 3, 4])
+    ap.add_argument("--attempts", type=int, default=1)
     ap.add_argument("--workers", type=int, default=6)
     ap.add_argument("--execute", type=int, default=10)
     ap.add_argument("--denoise", type=int, default=10)
@@ -141,10 +143,11 @@ def main():
     n = 0
     for split in args.splits:
         for seed in args.seeds:
-            for k, ep in enumerate(episode_dirs(split)):
-                jobs.put((split, seed, k, str(ep), bool(args.video) and split == "test" and seed == args.seeds[0]
-                          and k < args.video_episodes))
-                n += 1
+            for attempt in range(args.attempts):
+                for k, ep in enumerate(episode_dirs(split)):
+                    jobs.put((split, seed, attempt, k, str(ep), bool(args.video) and split == "test"
+                              and seed == args.seeds[0] and attempt == 0 and k < args.video_episodes))
+                    n += 1
     for _ in range(args.workers):
         jobs.put(None)
     procs = [ctx.Process(target=worker, args=(args.ckpt, args.execute, args.denoise, jobs, results, video_dir))
@@ -153,29 +156,30 @@ def main():
         p.start()
     per, trail, t0 = {}, {}, time.time()
     for i in range(n):
-        split, seed, name, ok, err = results.get()
-        per.setdefault(split, {}).setdefault(str(seed), {})[name] = ok
-        trail.setdefault(split, {}).setdefault(str(seed), {})[name] = err
-        if (i + 1) % 20 == 0 or i + 1 == n:
+        split, seed, attempt, name, ok, err = results.get()
+        per.setdefault(split, {}).setdefault(str(seed), {}).setdefault(name, [None] * args.attempts)[attempt] = ok
+        trail.setdefault(split, {}).setdefault(str(seed), {}).setdefault(name, [None] * args.attempts)[attempt] = err
+        if (i + 1) % max(20, n // 100) == 0 or i + 1 == n:
             print(f"{i + 1}/{n} runs, {(time.time() - t0) / 60:.1f} min", flush=True)
     for p in procs:
         p.join()
     summary = {}
     for split in args.splits:
         rates = [100 * np.mean(list(per[split][str(s)].values())) for s in args.seeds]
-        errs = [e for s in args.seeds for e in trail[split][str(s)].values()]
+        errs = [e for s in args.seeds for v in trail[split][str(s)].values() for e in v]
         replay = [np.median(np.linalg.norm(np.load(ep / "sim.npz")["eef_pos"] - pinch_sim(ep, np.load(ep / "sim.npz")),
                                            axis=1)) * 1000 for ep in episode_dirs(split)]
         summary[split] = {"episodes": len(per[split][str(args.seeds[0])]), "success_pct_per_seed": rates,
                           "mean": float(np.mean(rates)), "std": float(np.std(rates)),
                           "trail_mm_median": float(np.median(errs)), "replay_trail_mm_median": float(np.median(replay))}
         print(f"{split}: {summary[split]['mean']:.1f} +- {summary[split]['std']:.1f} % "
-              f"({summary[split]['episodes']} episodes x {len(args.seeds)} seeds; per seed {[round(r) for r in rates]}); "
+              f"({summary[split]['episodes']} episodes x {args.attempts} attempts x {len(args.seeds)} seeds; per seed {[round(r) for r in rates]}); "
               f"trail {summary[split]['trail_mm_median']:.0f} mm (replay {summary[split]['replay_trail_mm_median']:.0f} mm)")
     ck = torch.load(args.ckpt, map_location="cpu", weights_only=False)
-    out = args.ckpt.parent / f"eval_{args.ckpt.stem}.json"
+    out = args.ckpt.parent / f"eval_{args.ckpt.stem}{f'_x{args.attempts}' if args.attempts > 1 else ''}.json"
     out.write_text(json.dumps({"ckpt": str(args.ckpt), "step": ck["step"], "execute": args.execute,
-                               "denoise": args.denoise, "seeds": args.seeds, "summary": summary, "per_episode": per,
+                               "denoise": args.denoise, "seeds": args.seeds, "attempts": args.attempts,
+                               "summary": summary, "per_episode": per,
                                "trail_mm": trail},
                               indent=1))
     print("wrote", out)
