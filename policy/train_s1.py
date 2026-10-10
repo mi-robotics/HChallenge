@@ -8,7 +8,11 @@ padded (and masked out of the loss) past the episode end.
   cameras  agentview (third person), eye_in_hand (gripper), 256 x 256 -> 224 for DINOv2
   state    eef_pos [3], eef_quat [4], gripper_qpos [2]
   action   action[:, [0, 1, 2, 6]]: OSC delta xyz and gripper (the rotation dims are always 0 in the data)
-State and actions are z-scored with train-split statistics. Val loss on 1024 fixed val-split samples every
+State and actions are z-scored with train-split statistics. --img-aug applies LeRobot's default image transforms
+(lerobot/datasets/transforms.py ImageTransformsConfig, off by default there; HVLA's S1 training uses none) to each
+training image independently: 3 of {brightness 0.8-1.2, contrast 0.8-1.2, saturation 0.5-1.5, hue +-0.05,
+sharpness 0.5-1.5, affine +-5 deg / +-5 % shift}, drawn with equal weights, applied in that order. Written as
+batched GPU ops with torchvision's formulas (per image in a loop, torchvision's own took 0.4 s per batch). Val loss on 1024 fixed val-split samples every
 --val-every steps. Writes <out>/train.log, <out>/ckpt_<step>.pt and <out>/last.pt (model, config, norm stats).
 """
 import argparse
@@ -56,6 +60,81 @@ def load(split, device):
             torch.from_numpy(np.concatenate(action)).to(device), torch.from_numpy(np.concatenate(end)).to(device))
 
 
+N_AUGMENTS = 3  # LeRobot ImageTransformsConfig: max_num_transforms = 3, equal weights, fixed order
+
+
+def _gray(x):
+    return (0.2989 * x[:, 0] + 0.587 * x[:, 1] + 0.114 * x[:, 2]).unsqueeze(1)
+
+
+def _uniform(n, lo, hi, dev):
+    return torch.empty(n, 1, 1, 1, device=dev).uniform_(lo, hi)
+
+
+def _hue(x, shift):
+    """torchvision adjust_hue, batched: RGB -> HSV, h += shift (per image), -> RGB."""
+    r, g, b = x[:, 0], x[:, 1], x[:, 2]
+    maxc, minc = x.max(1).values, x.min(1).values
+    v, cr = maxc, maxc - minc
+    s = cr / torch.where(maxc == 0, torch.ones_like(maxc), maxc)
+    crd = torch.where(cr == 0, torch.ones_like(cr), cr)
+    rc, gc, bc = (maxc - r) / crd, (maxc - g) / crd, (maxc - b) / crd
+    h = torch.where(maxc == r, bc - gc, torch.where(maxc == g, 2.0 + rc - bc, 4.0 + gc - rc))
+    h = torch.fmod(h / 6.0 + 1.0 + shift.view(-1, 1, 1), 1.0)
+    i = torch.floor(h * 6.0)
+    f = h * 6.0 - i
+    i = i.long() % 6
+    p, q, t = v * (1 - s), v * (1 - s * f), v * (1 - s * (1 - f))
+    sel = [torch.stack(c, 1) for c in ((v, t, p), (q, v, p), (p, v, t), (p, q, v), (t, p, v), (v, p, q))]
+    out = torch.zeros_like(x)
+    for k in range(6):
+        out = torch.where((i == k).unsqueeze(1), sel[k], out)
+    return out
+
+
+def _sharpness(x, f):
+    """torchvision adjust_sharpness, batched: blend with a 3x3 smoothed image (border pixels kept)."""
+    k = torch.tensor([[1.0, 1.0, 1.0], [1.0, 5.0, 1.0], [1.0, 1.0, 1.0]], device=x.device) / 13
+    blur = torch.nn.functional.conv2d(x.reshape(-1, 1, *x.shape[2:]), k.view(1, 1, 3, 3)).reshape(
+        x.shape[0], 3, x.shape[2] - 2, x.shape[3] - 2)
+    deg = x.clone()
+    deg[:, :, 1:-1, 1:-1] = blur
+    return (f * x + (1 - f) * deg).clamp(0, 1)
+
+
+def _affine(x, deg, tx, ty):
+    """RandomAffine(degrees, translate), batched: rotate about the centre, shift, nearest, fill 0."""
+    a = torch.deg2rad(deg)
+    cos, sin = torch.cos(a), torch.sin(a)
+    theta = torch.stack([torch.stack([cos, -sin, -2 * tx], 1), torch.stack([sin, cos, -2 * ty], 1)], 1)
+    grid = torch.nn.functional.affine_grid(theta, list(x.shape), align_corners=False)
+    return torch.nn.functional.grid_sample(x, grid, mode="nearest", padding_mode="zeros", align_corners=False)
+
+
+def augment(images):
+    """LeRobot's default image transforms on a batch: each image gets its own random 3 of the 6, applied in order.
+    images: list of [B, H, W, 3] uint8 -> same."""
+    out = []
+    for cam in images:
+        x = cam.permute(0, 3, 1, 2).float() / 255
+        n, dev = len(x), x.device
+        pick = torch.rand(n, 6, device=dev).argsort(1)[:, :N_AUGMENTS]
+        use = torch.zeros(n, 6, dtype=torch.bool, device=dev).scatter_(1, pick, True).view(n, 6, 1, 1, 1)
+        steps = [lambda y: (y * _uniform(n, 0.8, 1.2, dev)).clamp(0, 1),  # brightness
+                 lambda y: (_uniform(n, 0.8, 1.2, dev) * (y - _gray(y).mean((2, 3), keepdim=True))
+                            + _gray(y).mean((2, 3), keepdim=True)).clamp(0, 1),  # contrast
+                 lambda y: (_uniform(n, 0.5, 1.5, dev) * (y - _gray(y)) + _gray(y)).clamp(0, 1),  # saturation
+                 lambda y: _hue(y, torch.empty(n, device=dev).uniform_(-0.05, 0.05)),  # hue
+                 lambda y: _sharpness(y, _uniform(n, 0.5, 1.5, dev)),  # sharpness
+                 lambda y: _affine(y, torch.empty(n, device=dev).uniform_(-5, 5),
+                                   torch.empty(n, device=dev).uniform_(-0.05, 0.05),
+                                   torch.empty(n, device=dev).uniform_(-0.05, 0.05))]  # affine
+        for k, f in enumerate(steps):
+            x = torch.where(use[:, k], f(x), x)
+        out.append((x * 255).round().to(torch.uint8).permute(0, 2, 3, 1))
+    return out
+
+
 def batch(data, idx, chunk, norm):
     imgs, state, action, end = data
     steps = idx[:, None] + torch.arange(chunk, device=idx.device)
@@ -77,6 +156,7 @@ def main():
     ap.add_argument("--save-every", type=int, default=5000)
     ap.add_argument("--out", type=Path, default=ROOT / "outputs" / "s1" / time.strftime("%Y%m%d_%H%M%S"))
     ap.add_argument("--seed", type=int, default=0)
+    ap.add_argument("--img-aug", action="store_true")
     args = ap.parse_args()
     args.out.mkdir(parents=True, exist_ok=True)
     log = open(args.out / "train.log", "a")
@@ -121,7 +201,7 @@ def main():
 
     def save(name, step):
         torch.save({"model": model.state_dict(), "config": cfg.to_dict(), "norm": {k: v.cpu() for k, v in norm.items()},
-                    "step": step, "cameras": CAMERAS, "state_keys": STATE_KEYS, "action_dims": ACTION_DIMS},
+                    "step": step, "img_aug": args.img_aug, "cameras": CAMERAS, "state_keys": STATE_KEYS, "action_dims": ACTION_DIMS},
                    args.out / name)
 
     model.train()
@@ -130,8 +210,11 @@ def main():
         for group in opt.param_groups:
             group["lr"] = lr_at(step)
         idx = torch.randint(0, len(train[1]), (args.batch,), device=dev)
+        images, state, actions, pad = batch(train, idx, args.chunk, norm)
+        if args.img_aug:
+            images = augment(images)
         with torch.autocast("cuda", dtype=torch.bfloat16):
-            loss = model(*batch(train, idx, args.chunk, norm))
+            loss = model(images, state, actions, pad)
         opt.zero_grad(set_to_none=True)
         loss.backward()
         grad = torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
