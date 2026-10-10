@@ -10,6 +10,11 @@ then the policy runs: predict a 32-step chunk from the two cameras + state (--de
 then LIBERO's On(cup, plate) decides success. Every (split, seed, episode) is one run; seed s sets the flow-matching
 noise (torch seed 1000 * s + episode index), the sim itself is deterministic. Runs are spread over --workers
 processes, each with its own model and env. Per split: success rate per seed, then mean +- std over the seeds.
+A flow checkpoint (--flow hand in training) gets, at every prediction at step i, the episode's recorded hand flow
+from flow_sim.npz rows i, i+2, .., i+30 (last row repeated past the end), indexed by sim time, not by progress.
+Trail error (every model): median distance from the gripper to the flow's pinch point (thumb / index tip midpoint,
+in the sim world) at the same step, over the recorded length; for the recorded replay itself it is printed as
+"replay" (the gripper lags the target by ~0.2 s, step 4.4).
 Writes <ckpt dir>/eval_<ckpt name>.json; --video tiles the third-person view of the first --video-episodes test
 episodes, seed 0.
 """
@@ -28,7 +33,7 @@ sys.path.insert(0, str(ROOT / "policy"))
 sys.path.insert(0, str(ROOT / "replay"))
 sys.path.insert(0, str(ROOT / "sim"))
 from s1_model import S1Config, S1Model  # noqa: E402
-from train_s1 import episode_dirs  # noqa: E402
+from train_s1 import episode_dirs, flow_features  # noqa: E402
 from replay import HZ, snapshot  # noqa: E402
 from scene import OPEN, make_env, move_to, place, reset, set_camera, set_third_person_camera  # noqa: E402
 
@@ -43,8 +48,18 @@ def load_policy(path, dev):
     return model, {k: v.to(dev) for k, v in ck["norm"].items()}, ck
 
 
+def pinch_sim(ep, sim):
+    hand = np.load(ep / "flow_sim.npz")["hand"]
+    return hand[1:3, :, :3].mean(0) + sim["sim_minus_real"]
+
+
 def run_episode(env, ep, model, norm, ck, execute, denoise, dev, frames=None):
+    """-> (success, trail error in mm)."""
     sim = np.load(ep / "sim.npz")
+    pinch, eef = pinch_sim(ep, sim), []
+    if ck.get("flow"):
+        hand = torch.from_numpy(np.load(ep / "flow_sim.npz")["hand"].transpose(1, 0, 2)).to(dev)
+        smr = torch.from_numpy(sim["sim_minus_real"].astype(np.float32)).to(dev)[None]
     sc = json.loads((ep / "scene.json").read_text())
     reset(env)
     obs = place(env, sc["sim_cup_xy"], sc["sim_plate_xy"])
@@ -53,16 +68,21 @@ def run_episode(env, ep, model, norm, ck, execute, denoise, dev, frames=None):
     set_third_person_camera(env)
     obs, *_ = move_to(env, obs, sim["eef_pos"][0], gripper=OPEN, max_steps=150)
     horizon, queue, last = len(sim["action"]) + EXTRA_S * HZ, [], np.zeros(7)
-    for _ in range(horizon):
+    for i in range(horizon):
         s = snapshot(obs)
+        eef.append(np.asarray(s["eef_pos"]))
         if frames is not None:
             frames.append(s["agentview"])
         if not queue:
             images = [torch.from_numpy(np.ascontiguousarray(s[c]))[None].to(dev) for c in ck["cameras"]]
-            state = torch.from_numpy(np.concatenate([np.asarray(s[k], np.float32).ravel() for k in ck["state_keys"]]))
-            state = ((state.to(dev) - norm["state_mean"]) / norm["state_std"])[None]
+            raw = torch.from_numpy(np.concatenate([np.asarray(s[k], np.float32).ravel() for k in ck["state_keys"]])).to(dev)
+            state = ((raw - norm["state_mean"]) / norm["state_std"])[None]
+            flow = None
+            if ck.get("flow"):
+                rows = torch.clamp(i + torch.arange(0, model.cfg.flow_steps * 2, 2, device=dev), max=len(hand) - 1)[None]
+                flow = (flow_features(hand, rows, smr, raw[None, :3]) - norm["flow_mean"]) / norm["flow_std"]
             with torch.autocast("cuda", dtype=torch.bfloat16):
-                chunk = model.sample(images, state, num_steps=denoise)[0].float()
+                chunk = model.sample(images, state, num_steps=denoise, flow=flow)[0].float()
             chunk = (chunk * norm["action_std"] + norm["action_mean"]).cpu().numpy()
             queue = list(chunk[:execute])
         a = queue.pop(0)
@@ -74,7 +94,8 @@ def run_episode(env, ep, model, norm, ck, execute, denoise, dev, frames=None):
         obs, *_ = env.step(np.r_[np.zeros(6), last[6]])
         if frames is not None:
             frames.append(snapshot(obs)["agentview"])
-    return bool(env.check_success())
+    n = len(sim["action"])
+    return bool(env.check_success()), float(1000 * np.median(np.linalg.norm(np.array(eef[:n]) - pinch[:n], axis=1)))
 
 
 def worker(ckpt, execute, denoise, jobs, results, video_dir):
@@ -88,10 +109,10 @@ def worker(ckpt, execute, denoise, jobs, results, video_dir):
         split, seed, k, ep, keep_frames = job
         frames = [] if keep_frames else None
         torch.manual_seed(1000 * seed + k)
-        ok = run_episode(env, Path(ep), model, norm, ck, execute, denoise, dev, frames)
+        ok, trail = run_episode(env, Path(ep), model, norm, ck, execute, denoise, dev, frames)
         if frames is not None:
             np.save(video_dir / f"{k:02d}_{Path(ep).name}.npy", np.stack(frames))
-        results.put((split, seed, Path(ep).name, ok))
+        results.put((split, seed, Path(ep).name, ok, trail))
     env.close()
 
 
@@ -125,10 +146,11 @@ def main():
              for _ in range(args.workers)]
     for p in procs:
         p.start()
-    per, t0 = {}, time.time()
+    per, trail, t0 = {}, {}, time.time()
     for i in range(n):
-        split, seed, name, ok = results.get()
+        split, seed, name, ok, err = results.get()
         per.setdefault(split, {}).setdefault(str(seed), {})[name] = ok
+        trail.setdefault(split, {}).setdefault(str(seed), {})[name] = err
         if (i + 1) % 20 == 0 or i + 1 == n:
             print(f"{i + 1}/{n} runs, {(time.time() - t0) / 60:.1f} min", flush=True)
     for p in procs:
@@ -136,14 +158,20 @@ def main():
     summary = {}
     for split in args.splits:
         rates = [100 * np.mean(list(per[split][str(s)].values())) for s in args.seeds]
+        errs = [e for s in args.seeds for e in trail[split][str(s)].values()]
+        replay = [np.median(np.linalg.norm(np.load(ep / "sim.npz")["eef_pos"] - pinch_sim(ep, np.load(ep / "sim.npz")),
+                                           axis=1)) * 1000 for ep in episode_dirs(split)]
         summary[split] = {"episodes": len(per[split][str(args.seeds[0])]), "success_pct_per_seed": rates,
-                          "mean": float(np.mean(rates)), "std": float(np.std(rates))}
+                          "mean": float(np.mean(rates)), "std": float(np.std(rates)),
+                          "trail_mm_median": float(np.median(errs)), "replay_trail_mm_median": float(np.median(replay))}
         print(f"{split}: {summary[split]['mean']:.1f} +- {summary[split]['std']:.1f} % "
-              f"({summary[split]['episodes']} episodes x {len(args.seeds)} seeds; per seed {[round(r) for r in rates]})")
+              f"({summary[split]['episodes']} episodes x {len(args.seeds)} seeds; per seed {[round(r) for r in rates]}); "
+              f"trail {summary[split]['trail_mm_median']:.0f} mm (replay {summary[split]['replay_trail_mm_median']:.0f} mm)")
     ck = torch.load(args.ckpt, map_location="cpu", weights_only=False)
     out = args.ckpt.parent / f"eval_{args.ckpt.stem}.json"
     out.write_text(json.dumps({"ckpt": str(args.ckpt), "step": ck["step"], "execute": args.execute,
-                               "denoise": args.denoise, "seeds": args.seeds, "summary": summary, "per_episode": per},
+                               "denoise": args.denoise, "seeds": args.seeds, "summary": summary, "per_episode": per,
+                               "trail_mm": trail},
                               indent=1))
     print("wrote", out)
     if args.video:

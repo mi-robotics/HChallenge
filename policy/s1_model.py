@@ -1,7 +1,7 @@
 """Flow-matching S1 action policy, extracted from HVLA (TheWisp/lerobot, src/lerobot/policies/hvla/s1/flow_matching,
 commit 13f05f3, Apache-2.0), without S2.
 
-  context = transformer encoder over [DINOv2 patch tokens of each camera, robot-state token]
+  context = transformer encoder over [DINOv2 patch tokens of each camera, robot-state token, optional flow tokens]
   decoder = transformer decoder: noisy action chunk (+ flow time) cross-attends to the context, predicts the velocity
 
 Flow matching (Lipman et al. 2023, as in pi0): x_t = t * noise + (1 - t) * actions, target v = noise - actions;
@@ -12,6 +12,10 @@ fine-tuned with gradient checkpointing), action + time fusion by concat -> MLP(S
 15 Euler steps. Removed: the S2 latent token and its age embedding, training-time RTC (the sim waits for the policy,
 so there is no inference delay to train for), saliency, checkpoint feature contracts. Changed: images are normalised
 with the ImageNet mean / std DINOv2 was trained with (HVLA feeds [0, 1] pixels).
+Added (both off by default, so the image-only checkpoints load unchanged):
+  flow_dim > 0     flow_steps tokens, one per future flow step, each a linear projection of that step's flow_dim values
+  obs_pos_embed    a learned embedding per context-token position, added before the obs encoder (HVLA has none, so
+                   the encoder could not tell the two cameras apart except by content, nor order the flow steps)
 """
 import math
 from dataclasses import asdict, dataclass
@@ -44,6 +48,9 @@ class S1Config:
     time_beta_beta: float = 1.0
     time_min: float = 0.001
     time_max: float = 1.0
+    flow_dim: int = 0
+    flow_steps: int = 16
+    obs_pos_embed: bool = False
 
     def to_dict(self):
         return asdict(self)
@@ -63,6 +70,12 @@ class S1Model(nn.Module):
         self.backbone = torch.hub.load("facebookresearch/dinov2", cfg.dino_model)
         self.image_proj = nn.Linear(cfg.backbone_dim, d)
         self.state_proj = nn.Linear(cfg.state_dim, d)
+        if cfg.flow_dim:
+            self.flow_proj = nn.Linear(cfg.flow_dim, d)
+        if cfg.obs_pos_embed:
+            n_ctx = cfg.n_cameras * (cfg.image_size // 14) ** 2 + 1 + (cfg.flow_steps if cfg.flow_dim else 0)
+            self.obs_pos_embed = nn.Embedding(n_ctx, d)
+            nn.init.normal_(self.obs_pos_embed.weight, std=0.02)
         layer = nn.TransformerEncoderLayer(d, cfg.num_heads, cfg.dim_feedforward, cfg.dropout, batch_first=True)
         self.obs_encoder = nn.TransformerEncoder(layer, cfg.num_encoder_layers)
         self.decoder_layers = nn.ModuleList([
@@ -83,8 +96,9 @@ class S1Model(nn.Module):
                           align_corners=False)
         return (x - self.img_mean) / self.img_std
 
-    def encode(self, images, state):
-        """images: list of [B, H, W, 3] uint8; state: [B, state_dim] normalised -> context [B, N_ctx, D]."""
+    def encode(self, images, state, flow=None):
+        """images: list of [B, H, W, 3] uint8; state: [B, state_dim]; flow: [B, flow_steps, flow_dim] (normalised)
+        -> context [B, N_ctx, D]."""
         B = state.shape[0]
         x = self.preprocess(images)
         if self.training:
@@ -95,7 +109,12 @@ class S1Model(nn.Module):
         patches = self.image_proj(patches)  # [n_cams * B, P, D]
         tokens = list(patches.reshape(len(images), B, *patches.shape[1:]))
         tokens.append(self.state_proj(state).unsqueeze(1))
-        return self.obs_encoder(torch.cat(tokens, dim=1))
+        if self.cfg.flow_dim:
+            tokens.append(self.flow_proj(flow))
+        x = torch.cat(tokens, dim=1)
+        if self.cfg.obs_pos_embed:
+            x = x + self.obs_pos_embed.weight.unsqueeze(0)
+        return self.obs_encoder(x)
 
     def denoise_step(self, x_t, context, t):
         """x_t: [B, T, A]; t: [B] flow time -> velocity [B, T, A]."""
@@ -108,10 +127,10 @@ class S1Model(nn.Module):
             x = layer(x, context)
         return self.action_out_proj(x)
 
-    def forward(self, images, state, actions, action_pad):
+    def forward(self, images, state, actions, action_pad, flow=None):
         """Flow-matching loss. actions: [B, T, A] normalised; action_pad: [B, T] True past the episode end."""
         B = actions.shape[0]
-        context = self.encode(images, state)
+        context = self.encode(images, state, flow)
         t = torch.distributions.Beta(self.cfg.time_beta_alpha, self.cfg.time_beta_beta).sample((B,)).to(actions.device)
         t = t * (self.cfg.time_max - self.cfg.time_min) + self.cfg.time_min
         noise = torch.randn_like(actions)
@@ -121,10 +140,10 @@ class S1Model(nn.Module):
         return ((v.float() - (noise - actions)) ** 2 * mask).sum() / mask.sum().clamp(min=1) / actions.shape[-1]
 
     @torch.no_grad()
-    def sample(self, images, state, num_steps=None):
+    def sample(self, images, state, num_steps=None, flow=None):
         """-> normalised action chunk [B, T, A]."""
         num_steps = num_steps or self.cfg.num_inference_steps
-        context = self.encode(images, state)
+        context = self.encode(images, state, flow)
         x = torch.randn(state.shape[0], self.cfg.chunk_size, self.cfg.action_dim, device=state.device)
         dt = -1.0 / num_steps
         for i in range(num_steps):
