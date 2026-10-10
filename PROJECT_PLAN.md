@@ -221,6 +221,10 @@ Dropped after step 1.9. Offline replay of a recorded video already gets the sim 
 4. Train the main policy (flow + images + state).
 5. Evaluate in sim by feeding **recorded** flows from held-out test episodes.
 
+### Notes
+
+- **5.1** Image-only S1 baseline (`policy/s1_model.py`, `train_s1.py`, `eval_s1.py`): HVLA's flow-matching S1 (TheWisp/lerobot 13f05f3, Apache-2.0) without S2 or training-time RTC; DINOv2 ViT-S/14 fine-tuned on the third-person and gripper cameras (256 → 224, ImageNet-normalised; HVLA feeds [0, 1]) + state token (eef pos, quat, fingers) → 32-step chunk of (xyz, gripper); 93.5 M params. Gripper camera first re-recorded at 256 for all 146 replayed episodes (kept 100/100 again; 112930 failed again, so it has now gone pass / fail / pass / fail). Trained on the 80 train episodes held on the GPU (6.6 GB), batch 64, LR 2.5e-5 cosine, 20k steps, 56 min. Train loss 1.9 → 0.02; **val loss lowest at 2k (0.57), then rises to 1.42**: not a bug (ckpt 5k on the same code: train 0.13, val 0.74), the model memorises 80 episodes. Closed loop (episode's scene and start pose, executes 8 of 32 actions, recorded length + 3 s): replaying the recorded actions through the evaluator reproduces success 6/6. Val success over 2 runs (different flow-matching noise): 5k 12/20, 10k 10/20, **15k 16/20**, 20k 14/20; two runs of one checkpoint disagree on 2/10 episodes. **Test, 15k: 10/20 (6/10, 4/10).** Failures in the video: cup set down beside the plate or tipped over. Next to try against overfitting: image augmentation, lower LR for DINOv2.
+
 ### Evaluation
 
 | Metric | What it tells me |

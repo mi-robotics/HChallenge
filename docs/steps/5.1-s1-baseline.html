@@ -1,0 +1,85 @@
+<title>Step 5.1 · S1 Baseline</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;700;800&family=JetBrains+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: single column. Title, results table, test video, training plot, setup notes, files */
+:root {
+  --bg: #f5f6f8; --surface: #ffffff; --fg: #1a1e26; --muted: #5d6573; --line: #dde1e8; --accent: #2d4fd0;
+  --display: "Archivo", "Helvetica Neue", Arial, sans-serif;
+  --mono: "JetBrains Mono", ui-monospace, Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #12151b; --surface: #1a1e26; --fg: #e6e9ef; --muted: #98a0ae; --line: #2c323d; --accent: #8aa2ff; color-scheme: dark } }
+:root[data-theme="dark"] {
+  --bg: #12151b; --surface: #1a1e26; --fg: #e6e9ef; --muted: #98a0ae; --line: #2c323d; --accent: #8aa2ff; color-scheme: dark }
+
+body { background: var(--bg); color: var(--fg); font: 15px/1.5 var(--display); padding-inline: 16px; padding-block: 40px 64px; }
+main { max-width: 56rem; margin: 0 auto; display: grid; gap: 28px; }
+.eyebrow { font: 500 12px/1 var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+h1 { font: 800 clamp(28px, 6vw, 38px)/1.1 var(--display); margin: 10px 0 0; text-wrap: balance; }
+pre { margin: 0; padding: 14px 16px; background: var(--surface); border: 1px solid var(--line); border-radius: 6px; font: 13.5px/1.6 var(--mono); overflow-x: auto; }
+figcaption { font: 13px/1.5 var(--mono); color: var(--muted); }
+figure { margin: 0; display: grid; gap: 8px; }
+.scroll { overflow-x: auto; }
+table { border-collapse: collapse; width: 100%; font: 13px/1.4 var(--mono); font-variant-numeric: tabular-nums; }
+th, td { text-align: left; padding: 8px 12px 8px 0; border-bottom: 1px solid var(--line); white-space: nowrap; }
+thead th { font-weight: 500; color: var(--muted); }
+.notes { margin: 0; padding-left: 1.2em; display: grid; gap: 8px; max-width: 72ch; }
+.notes li { min-width: 0; }
+h2 { font: 700 20px/1.25 var(--display); margin: 12px 0 0; }
+p { margin: 0; max-width: 68ch; }
+video { display: block; width: 100%; max-width: min(26rem, 100%); margin-inline: auto; aspect-ratio: 512 / 1280; border-radius: 6px; border: 1px solid var(--line); background: var(--surface); }
+img.result { display: block; width: 100%; max-width: 100%; border-radius: 6px; border: 1px solid var(--line); background: var(--surface); }
+.files { list-style: none; margin: 0; padding: 0; display: grid; }
+.files li { display: grid; grid-template-columns: minmax(0, 13rem) 1fr; gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--line); }
+.files a { font: 13.5px var(--mono); color: var(--accent); overflow-wrap: anywhere; }
+.files a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.files span { color: var(--muted); }
+@media (max-width: 480px) { .files li { grid-template-columns: 1fr; gap: 2px; } }
+</style>
+
+<main>
+  <header>
+    <span class="eyebrow">Step 5.1 · Phase 5</span>
+    <h1>Image-only S1 baseline: cup on the plate in 10 of 20 test runs</h1>
+  </header>
+
+  <div class="scroll">
+    <table>
+      <thead><tr><th>checkpoint</th><th>val run 1</th><th>val run 2</th><th>val total</th><th>test (2 runs)</th></tr></thead>
+      <tbody>
+        <tr><th scope="row">5k</th><td>7/10</td><td>5/10</td><td>12/20</td><td>–</td></tr>
+        <tr><th scope="row">10k</th><td>5/10</td><td>5/10</td><td>10/20</td><td>–</td></tr>
+        <tr><th scope="row">15k (chosen on val)</th><td>9/10</td><td>7/10</td><td>16/20</td><td><b>10/20</b> (6/10, 4/10)</td></tr>
+        <tr><th scope="row">20k</th><td>6/10</td><td>8/10</td><td>14/20</td><td>–</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p style="font: 13px/1.5 var(--mono); color: var(--muted)">Closed loop in LIBERO: each run uses the scene its episode was recorded in (plate position), starts where that episode started, and succeeds if the cup is on the plate after the episode length + 3 s. The two runs differ only in the flow-matching noise; they disagree on 2 of 10 episodes for every checkpoint, so one 10-episode run is about ±2.</p>
+
+  <figure>
+    <video src="media/phase5/task1/eval_test.mp4" controls autoplay muted loop playsinline aria-label="Ten sim runs of the learned policy, one per test scene: the arm reaches the red mug, grasps it and carries it to the plate; in some runs the mug is set down beside the plate or tips over."></video>
+    <figcaption>Test scenes, run 1 (6/10), third-person camera. Failures are mostly the cup set down beside the plate or tipped over.</figcaption>
+  </figure>
+
+  <figure>
+    <img class="result" src="media/phase5/task1/training.png" alt="Left: training loss falls from 1.9 to 0.02 over 20k steps while val loss is lowest at step 2000 (0.57) and rises to 1.42. Right: val success per checkpoint, 12, 10, 16 and 14 out of 20.">
+    <figcaption>Val loss rises after step 2k (same checkpoint, same code: train 0.13, val 0.74 at 5k), so the model memorises the 80 training episodes; closed-loop success does not follow val loss, so checkpoints are chosen by val success.</figcaption>
+  </figure>
+
+  <ul class="notes">
+    <li>Model: HVLA's flow-matching S1 (TheWisp/lerobot, Apache-2.0) with S2 and training-time RTC removed. DINOv2 ViT-S/14 (fine-tuned) on two cameras (third person + gripper, 256 → 224) and a state token (end-effector pose, finger positions) → transformer encoder → decoder predicting 32 actions (xyz move, gripper; 1.6 s). 93.5 M parameters. No language and no flow input.</li>
+    <li>Training: 80 train episodes (14,759 steps), all on the GPU; batch 64, AdamW, LR 2.5e-5 cosine to 2.5e-6, 20k steps, 56 min on the RTX 5090. No image augmentation.</li>
+    <li>Execution: predict a chunk, run its first 8 actions, predict again (15 Euler steps, 0.1 s per prediction).</li>
+    <li>Gripper camera re-recorded at 256 × 256 for all 146 replayed episodes before training (was 128); all 100 kept episodes succeeded again.</li>
+    <li>Evaluator check: replaying the recorded actions through the same setup reproduces success in 6/6 episodes.</li>
+  </ul>
+
+  <ul class="files">
+    <li><a href="https://github.com/mi-robotics/HumanoidsChallenge/blob/main/policy/s1_model.py" target="_blank" rel="noopener">policy/s1_model.py</a><span>The S1 model, extracted from HVLA</span></li>
+    <li><a href="https://github.com/mi-robotics/HumanoidsChallenge/blob/main/policy/train_s1.py" target="_blank" rel="noopener">policy/train_s1.py</a><span>Trainer, data held on the GPU</span></li>
+    <li><a href="https://github.com/mi-robotics/HumanoidsChallenge/blob/main/policy/eval_s1.py" target="_blank" rel="noopener">policy/eval_s1.py</a><span>Closed-loop evaluation in LIBERO</span></li>
+    <li><a href="https://github.com/mi-robotics/HumanoidsChallenge/blob/main/media/phase5/task1/eval_test.mp4" target="_blank" rel="noopener">media/phase5/task1/eval_test.mp4</a><span>Test-scene video</span></li>
+    <li><a href="https://github.com/mi-robotics/HumanoidsChallenge/blob/main/media/phase5/task1/training.png" target="_blank" rel="noopener">media/phase5/task1/training.png</a><span>Loss and val success</span></li>
+  </ul>
+</main>

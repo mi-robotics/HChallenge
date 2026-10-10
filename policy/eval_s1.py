@@ -6,8 +6,8 @@ Per episode: the scene that episode was recorded in (sim cup and plate from scen
 gripper driven to where the recorded episode started (sim.npz eef_pos[0], fingers open; the replay starts there too),
 then the policy runs: predict a 32-step chunk from the two cameras + state, execute the first --execute actions,
 repeat. The episode gets the recorded length + 3 s, then 1 s of zero actions for the cup to settle, then LIBERO's
-On(cup, plate) decides success. Writes <ckpt dir>/eval_<split>.json; --video tiles the third-person view of the
-first --video-episodes episodes.
+On(cup, plate) decides success. Writes <ckpt dir>/eval_<split>_<ckpt name>_seed<seed>.json; --video tiles the third-person view
+of the first --video-episodes episodes.
 """
 import argparse
 import json
@@ -79,6 +79,7 @@ def main():
     ap.add_argument("--execute", type=int, default=8)
     ap.add_argument("--video", type=Path)
     ap.add_argument("--video-episodes", type=int, default=4)
+    ap.add_argument("--seed", type=int, default=0)
     args = ap.parse_args()
     dev = torch.device("cuda")
     model, norm, ck = load_policy(args.ckpt, dev)
@@ -86,6 +87,7 @@ def main():
     results, videos = {}, []
     for k, ep in enumerate(episode_dirs(args.split)):
         frames = [] if args.video and k < args.video_episodes else None
+        torch.manual_seed(args.seed + k)  # the flow-matching noise; the sim itself is deterministic
         results[ep.name] = run_episode(env, ep, model, norm, ck, args.execute, dev, frames)
         print(f"{ep.name}: {'SUCCESS' if results[ep.name] else 'FAIL'}", flush=True)
         if frames is not None:
@@ -93,8 +95,8 @@ def main():
     env.close()
     n = sum(results.values())
     print(f"{args.split}: {n}/{len(results)} succeeded")
-    out = args.ckpt.parent / f"eval_{args.split}.json"
-    out.write_text(json.dumps({"ckpt": str(args.ckpt), "step": ck["step"], "execute": args.execute,
+    out = args.ckpt.parent / f"eval_{args.split}_{args.ckpt.stem}_seed{args.seed}.json"
+    out.write_text(json.dumps({"ckpt": str(args.ckpt), "step": ck["step"], "execute": args.execute, "seed": args.seed,
                                "success": n, "episodes": len(results), "per_episode": results}, indent=1))
     if args.video:
         write_grid(videos, args.video)

@@ -3,14 +3,14 @@
 Real recordings of my hand moving a mug onto a saucer (Intel RealSense D405), each replayed offline by a Panda in
 LIBERO, with hand and mug action flow extracted from the video. Recorded 2026-10-09.
 
-The episode data is not in git (17 GB). This file, `split.py` and `splits.json` are.
+The episode data is not in git (18.5 GB). This file, `split.py` and `splits.json` are.
 
 ## Where it lives
 
 ```
 data/
-├── mug_pnp_dataset/      100 kept episodes: the sim replay put the cup on the plate (11 GB)
-├── mug_pnp_failed/       65 failed episodes: replay failed, or the hand track gave no grasp (6.1 GB)
+├── mug_pnp_dataset/      100 kept episodes: the sim replay put the cup on the plate (12 GB)
+├── mug_pnp_failed/       65 failed episodes: replay failed, or the hand track gave no grasp (6.5 GB)
 ├── demos/                5 Phase 1 demos (saucer always in one place; not in the dataset)
 ├── demos_old/            5 demos from the first camera setup (not used)
 ├── calibration/          ChArUco board captures used to check the D405 factory intrinsics (step 1.2)
@@ -48,8 +48,9 @@ found in the hand track, or the hand was lost), 2 have nothing past the raw reco
 | failed | 46 | 7,876 | failed, with robot data and paired video + flow |
 | failed_no_robot | 17 | – | failed, real-clock flow only |
 
-20261009_112930 is in `failed`: it passed in step 4.2, failed in 4.3 (cup 1.5 cm from the plate centre) and passed
-again when the failed episodes were recorded; the replay is not fully repeatable on borderline set-downs.
+20261009_112930 is in `failed`: it passed in step 4.2, failed in 4.3 (cup 1.5 cm from the plate centre), passed
+once more when the failed episodes were first recorded and failed again in the step 5.1 re-recording; the replay
+is not fully repeatable on borderline set-downs. In that re-recording all 100 kept episodes succeeded again.
 
 ## Why episodes failed
 
@@ -101,7 +102,7 @@ Training data (robot clock; kept episodes and the 46 replayed failed ones):
 | `eef_pos`, `eef_quat` | [S,3], [S,4] | end-effector pose, sim world |
 | `cup_pos`, `cup_quat`, `plate_pos` | [S,3], [S,4], [S,3] | object state, sim world (cup_pos is the mug base) |
 | `agentview` | [S,256,256,3] uint8 | third-person RGB (`sim/scene.py` THIRD_PERSON) |
-| `eye_in_hand` | [S,128,128,3] uint8 | gripper camera RGB |
+| `eye_in_hand` | [S,256,256,3] uint8 | gripper camera RGB (128 × 128 until step 5.1, then all 146 replayed episodes were re-recorded at 256) |
 | `t_real` | [S] | real-video time this step follows (s) |
 | `sim_minus_real` | [3] | table → sim world offset |
 | `success`, `hz`, `sim_plate_xy` | | LIBERO On(cup, plate) at the end, 20, plate position |
@@ -111,7 +112,7 @@ Raw recording (`replay/record.py`). The source of everything else; keep.
 | file | what it is |
 |---|---|
 | `color.mp4` | 1280 × 720 colour, 30 fps |
-| `depth.mkv` | depth aligned to colour, lossless uint16, metres = value × `depth_scale` (1e-4); 11 GB of the 17 GB |
+| `depth.mkv` | depth aligned to colour, lossless uint16, metres = value × `depth_scale` (1e-4); 11 GB of the 18.5 GB |
 | `frames.csv` | per camera frame: index, camera frame number, timestamp_ms |
 | `meta.json` | instruction ("put the cup on the plate"), fps, frames, dropped_frames, duration_s, image_size, camera_matrix, dist_coeffs, depth_scale |
 
