@@ -27,7 +27,7 @@ At the end: **real photo + instruction → flow → robot does the task in sim.*
 | Point tracking | CoTracker (offline) | For clean action flow in the dataset. |
 | Flow format | hand [6, 16, 4] + cup [8, 16, 4]: points × timesteps (10 Hz) × (x, y, z, visible), metres, table frame | Defined in step 3.1: `flow/FORMAT.md`, constants in `flow/format.py`. |
 | Sim actions for the dataset | Offline replay of recorded videos; failed replays dropped | Changed after step 1.9: replay with rim-grasp constraints succeeded 5/5, so live teleop (Phase 2) was dropped. |
-| Compute | Laptop for recording + sim replay, Google Colab GPU for training | |
+| Compute | Local RTX 5090 for recording, sim replay and training | Changed in Phase 5: the training split (two 256 × 256 cameras, 5.8 GB uint8) fits on the GPU, so no data loader; Colab not needed. |
 | Deadline | ___ | |
 
 ---
@@ -215,10 +215,11 @@ Dropped after step 1.9. Offline replay of a recorded video already gets the sim 
 
 ### Steps
 
-1. Build the training dataset from Phase 4 (flow, sim obs, robot actions). Includes the slicing moved from step 3.6: sample s = flow steps s … s+15 (last step repeated past the end), paired with the sim observation and actions at the matching replay step (replay is 20 Hz, flow 10 Hz, plus any time the replay constraints add).
-2. Train the simple baseline. Check the loss goes down and predictions look sensible.
-3. Train the main policy on Colab.
-4. Evaluate in sim by feeding **recorded** flows from held-out test episodes.
+1. **Image-only S1 baseline (no flow).** The S1 action policy from HVLA (TheWisp/lerobot, flow matching, S2 removed): two sim cameras (third person + gripper, 256 → 224 for DINOv2) + robot state → 32-step action chunk; train on the 80 train episodes, evaluate closed loop in sim on the test scenes. What a normal visuomotor policy gets from this data, for the flow-conditioned policy to beat.
+2. Build the flow-conditioned training dataset from Phase 4 (flow, sim obs, robot actions), all on the robot's clock: sample at sim step i = `flow_sim.npz` rows i … i+30 step 2 (16 steps at 10 Hz), with `sim.npz` and `video_sim.mp4` at step i.
+3. Train the simple flow baseline. Check the loss goes down and predictions look sensible.
+4. Train the main policy (flow + images + state).
+5. Evaluate in sim by feeding **recorded** flows from held-out test episodes.
 
 ### Evaluation
 

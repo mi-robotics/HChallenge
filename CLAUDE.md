@@ -50,7 +50,7 @@ simple sim (LIBERO / robosuite). Submitted as a public GitHub repo with a README
   OSC_POSE delta at 20 Hz; action[:3] = 1 means 5 cm per step; gripper -1 open, +1 close.
 - The mug (9–10 cm wide, 13.5 cm tall) is too wide for the Panda's 8 cm grip: grasp the rim with
   one finger inside, at cup centre + 4 cm in y (fingers close along world y).
-- Training runs on Google Colab GPU; recording + sim replay run locally. Live teleop (Phase 2) was dropped after step 1.9.
+- Recording, sim replay and training all run locally (RTX 5090; the training split fits on the GPU). Policies: `policy/` (Phase 5 S1 baseline: `train_s1.py`, `eval_s1.py`, checkpoints in `outputs/`, gitignored). Live teleop (Phase 2) was dropped after step 1.9.
 
 ## Camera and table frame
 

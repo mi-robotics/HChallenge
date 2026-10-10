@@ -36,7 +36,7 @@ MEDIA = ROOT / "media" / "phase1" / "task9"
 HZ = 20
 W, H = 640, 360
 CONSTRAINTS = ("approach", "settle", "lift")
-EYE_IN_HAND_PX = 128  # the third-person camera is saved at the env's size (256); the gripper camera at 128
+EYE_IN_HAND_PX = 256  # both cameras are saved at the env's size (256 x 256)
 CLEAR_M, NEAR_M, ARRIVE_S, GRIP_S, LIFT_M, OPEN_HOLD_S = 0.08, 0.01, 0.5, 0.5, 0.10, 0.25
 
 

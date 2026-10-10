@@ -16,3 +16,6 @@ third_party/
 
 # Small result videos for reports/README are kept
 !media/**/*.mp4
+
+# Training runs (checkpoints, logs)
+outputs/
