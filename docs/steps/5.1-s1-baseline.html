@@ -2,7 +2,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;700;800&family=JetBrains+Mono:wght@400;500&display=swap">
 <style>
-/* Layout: single column. Title, results table, test video, training plot, setup notes, files */
+/* Layout: single column. Title, comparison table, two test videos, loss plot, setup notes, files */
 :root {
   --bg: #f5f6f8; --surface: #ffffff; --fg: #1a1e26; --muted: #5d6573; --line: #dde1e8; --accent: #2d4fd0;
   --display: "Archivo", "Helvetica Neue", Arial, sans-serif;
@@ -41,37 +41,40 @@ img.result { display: block; width: 100%; max-width: 100%; border-radius: 6px; b
 <main>
   <header>
     <span class="eyebrow">Step 5.1 · Phase 5</span>
-    <h1>Image-only S1 baseline: cup on the plate in 10 of 20 test runs</h1>
+    <h1>Image-only S1 baseline: 72 ± 8 % on test scenes with image augmentation, 60 ± 9 % without</h1>
   </header>
 
   <div class="scroll">
     <table>
-      <thead><tr><th>checkpoint</th><th>val run 1</th><th>val run 2</th><th>val total</th><th>test (2 runs)</th></tr></thead>
+      <thead><tr><th>model (20k steps)</th><th>train (80)</th><th>val (10)</th><th>test (10)</th><th>failed (46)</th></tr></thead>
       <tbody>
-        <tr><th scope="row">5k</th><td>7/10</td><td>5/10</td><td>12/20</td><td>–</td></tr>
-        <tr><th scope="row">10k</th><td>5/10</td><td>5/10</td><td>10/20</td><td>–</td></tr>
-        <tr><th scope="row">15k (chosen on val)</th><td>9/10</td><td>7/10</td><td>16/20</td><td><b>10/20</b> (6/10, 4/10)</td></tr>
-        <tr><th scope="row">20k</th><td>6/10</td><td>8/10</td><td>14/20</td><td>–</td></tr>
+        <tr><th scope="row">baseline_v1</th><td>85.5 ± 2.4</td><td>82.0 ± 4.0</td><td>60.0 ± 8.9</td><td>42.6 ± 3.3</td></tr>
+        <tr><th scope="row">baseline_v1_img_aug</th><td><b>88.5 ± 3.9</b></td><td><b>88.0 ± 11.7</b></td><td><b>72.0 ± 7.5</b></td><td>42.6 ± 1.1</td></tr>
       </tbody>
     </table>
   </div>
-  <p style="font: 13px/1.5 var(--mono); color: var(--muted)">Closed loop in LIBERO: each run uses the scene its episode was recorded in (plate position), starts where that episode started, and succeeds if the cup is on the plate after the episode length + 3 s. The two runs differ only in the flow-matching noise; they disagree on 2 of 10 episodes for every checkpoint, so one 10-episode run is about ±2.</p>
+  <p style="font: 13px/1.5 var(--mono); color: var(--muted)">Success %, mean ± std over 5 seeds (seed = flow-matching noise; the sim is deterministic). Closed loop in LIBERO: each run uses the scene its episode was recorded in, starts where that episode started, predicts 32 actions with 10 Euler steps, executes the first 10, and succeeds if the cup is on the plate after the episode length + 3 s. 730 runs per model, 10 min on 8 workers. "failed" = the 46 scenes whose replay of my hand failed; neither model trained on them.</p>
+
+  <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(min(15rem, 100%), 1fr)); gap: 16px">
+    <figure>
+      <video src="media/phase5/task1/eval_test.mp4" controls autoplay muted loop playsinline aria-label="Ten sim runs of baseline_v1, one per test scene."></video>
+      <figcaption>baseline_v1, test scenes, seed 0 (5/10)</figcaption>
+    </figure>
+    <figure>
+      <video src="media/phase5/task1/eval_test_img_aug.mp4" controls autoplay muted loop playsinline aria-label="Ten sim runs of baseline_v1_img_aug, one per test scene."></video>
+      <figcaption>baseline_v1_img_aug, test scenes, seed 0 (8/10)</figcaption>
+    </figure>
+  </div>
 
   <figure>
-    <video src="media/phase5/task1/eval_test.mp4" controls autoplay muted loop playsinline aria-label="Ten sim runs of the learned policy, one per test scene: the arm reaches the red mug, grasps it and carries it to the plate; in some runs the mug is set down beside the plate or tips over."></video>
-    <figcaption>Test scenes, run 1 (6/10), third-person camera. Failures are mostly the cup set down beside the plate or tipped over.</figcaption>
-  </figure>
-
-  <figure>
-    <img class="result" src="media/phase5/task1/training.png" alt="Left: training loss falls from 1.9 to 0.02 over 20k steps while val loss is lowest at step 2000 (0.57) and rises to 1.42. Right: val success per checkpoint, 12, 10, 16 and 14 out of 20.">
-    <figcaption>Val loss rises after step 2k (same checkpoint, same code: train 0.13, val 0.74 at 5k), so the model memorises the 80 training episodes; closed-loop success does not follow val loss, so checkpoints are chosen by val success.</figcaption>
+    <img class="result" src="media/phase5/task1/training.png" alt="Training loss falls to 0.019 (baseline_v1) and 0.031 (img_aug) over 20k steps. Val loss is lowest at 2k (0.57) and 3k (0.44) and rises to 1.42 and 0.90.">
+    <figcaption>Val loss rises after 2–3k steps in both runs: the model memorises the 80 training episodes (5k checkpoint, same code: train 0.13, val 0.74). Augmentation slows this (val at 20k 0.90 vs 1.42) but does not stop it.</figcaption>
   </figure>
 
   <ul class="notes">
     <li>Model: HVLA's flow-matching S1 (TheWisp/lerobot, Apache-2.0) with S2 and training-time RTC removed. DINOv2 ViT-S/14 (fine-tuned) on two cameras (third person + gripper, 256 → 224) and a state token (end-effector pose, finger positions) → transformer encoder → decoder predicting 32 actions (xyz move, gripper; 1.6 s). 93.5 M parameters. No language and no flow input.</li>
-    <li>Training: 80 train episodes (14,759 steps), all on the GPU; batch 64, AdamW, LR 2.5e-5 cosine to 2.5e-6, 20k steps, 56 min on the RTX 5090. No image augmentation.</li>
-    <li>Execution: predict a chunk, run its first 8 actions, predict again (15 Euler steps, 0.1 s per prediction).</li>
-    <li>Gripper camera re-recorded at 256 × 256 for all 146 replayed episodes before training (was 128); all 100 kept episodes succeeded again.</li>
+    <li>Training: 80 train episodes (14,759 steps), all on the GPU; batch 64, AdamW, LR 2.5e-5 cosine to 2.5e-6, 20k steps, 54–56 min on the RTX 5090. img_aug: LeRobot's default image transforms (HVLA uses none): per image 3 of brightness, contrast, saturation, hue, sharpness, small affine, as batched GPU ops (0.02 s per batch).</li>
+        <li>Gripper camera re-recorded at 256 × 256 for all 146 replayed episodes before training (was 128); all 100 kept episodes succeeded again.</li>
     <li>Evaluator check: replaying the recorded actions through the same setup reproduces success in 6/6 episodes.</li>
   </ul>
 
@@ -79,7 +82,8 @@ img.result { display: block; width: 100%; max-width: 100%; border-radius: 6px; b
     <li><a href="https://github.com/mi-robotics/HumanoidsChallenge/blob/main/policy/s1_model.py" target="_blank" rel="noopener">policy/s1_model.py</a><span>The S1 model, extracted from HVLA</span></li>
     <li><a href="https://github.com/mi-robotics/HumanoidsChallenge/blob/main/policy/train_s1.py" target="_blank" rel="noopener">policy/train_s1.py</a><span>Trainer, data held on the GPU</span></li>
     <li><a href="https://github.com/mi-robotics/HumanoidsChallenge/blob/main/policy/eval_s1.py" target="_blank" rel="noopener">policy/eval_s1.py</a><span>Closed-loop evaluation in LIBERO</span></li>
-    <li><a href="https://github.com/mi-robotics/HumanoidsChallenge/blob/main/media/phase5/task1/eval_test.mp4" target="_blank" rel="noopener">media/phase5/task1/eval_test.mp4</a><span>Test-scene video</span></li>
-    <li><a href="https://github.com/mi-robotics/HumanoidsChallenge/blob/main/media/phase5/task1/training.png" target="_blank" rel="noopener">media/phase5/task1/training.png</a><span>Loss and val success</span></li>
+    <li><a href="https://github.com/mi-robotics/HumanoidsChallenge/blob/main/media/phase5/task1/eval_test.mp4" target="_blank" rel="noopener">media/phase5/task1/eval_test.mp4</a><span>Test-scene video, baseline_v1</span></li>
+    <li><a href="https://github.com/mi-robotics/HumanoidsChallenge/blob/main/media/phase5/task1/eval_test_img_aug.mp4" target="_blank" rel="noopener">media/phase5/task1/eval_test_img_aug.mp4</a><span>Test-scene video, img_aug</span></li>
+    <li><a href="https://github.com/mi-robotics/HumanoidsChallenge/blob/main/media/phase5/task1/training.png" target="_blank" rel="noopener">media/phase5/task1/training.png</a><span>Loss curves, both runs</span></li>
   </ul>
 </main>
