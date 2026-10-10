@@ -49,21 +49,23 @@ cup   float32 [8, N, 4]
 
 Sample at step i = `hand[:, i:i+16]` (padded as above). Slicing is step 3.6.
 
-## One episode on the robot's clock (kept episodes)
+## One episode on the robot's clock (kept and replayed failed episodes)
 
 `flow_sim.npz` (`flow/sim_clock.py`, step 4.4): the same points with one row per `sim.npz` control step (20 Hz),
-so flow and robot data have the same length. Each row is `flow.npz` at the real-video time that sim step follows
+so flow and robot data have the same length. Also written for the failed episodes whose replay ran (step 4.5). Each row is `flow.npz` at the real-video time that sim step follows
 (`t_real`); during the steps the replay inserts (settle and close at the grasp, hold and rise after the release,
 the final 1 s wait; 55 steps per episode) the points stand still.
 
 ```
 t       float32 [N_sim]          sim time, step / 20
 t_real  float32 [N_sim]          real-video time followed (from sim.npz)
+frame   int     [N_sim]          color.mp4 frame shown at each step (nearest camera frame to t_real)
 hand    float32 [6, N_sim, 4]    table frame
 cup     float32 [8, N_sim, 4]
 ```
 
 Sample at sim step i = `hand[:, i:i+32:2]` (16 steps at 10 Hz of robot time, padded as above).
+`video_sim.mp4` next to it is the real video on the same clock: video frame i = `color.mp4` frame `frame[i]`.
 
 ## Table frame → sim
 
