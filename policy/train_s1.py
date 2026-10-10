@@ -223,7 +223,7 @@ def main():
 
     cfg = S1Config(action_dim=len(ACTION_DIMS), state_dim=train[1].shape[1], n_cameras=len(cameras), chunk_size=args.chunk,
                    flow_dim=4 * FLOW_POINTS[args.flow] if args.flow else 0, flow_steps=args.chunk // 2, obs_pos_embed=args.obs_pos_embed,
-                   img_pos_embed=not args.no_img_pos_embed, flow_token_drop=args.flow_drop)
+                   img_pos_embed=not args.no_img_pos_embed, flow_drop=args.flow_drop)
     model = S1Model(cfg).to(dev)
     say(f"parameters: {sum(p.numel() for p in model.parameters()) / 1e6:.1f} M; args {vars(args)}")
     opt = torch.optim.AdamW(model.parameters(), lr=args.lr, weight_decay=1e-4)

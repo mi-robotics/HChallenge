@@ -42,7 +42,9 @@ EXTRA_S = 3
 
 def load_policy(path, dev):
     ck = torch.load(path, map_location=dev, weights_only=False)
-    model = S1Model(S1Config(**ck["config"])).to(dev)
+    cfg = dict(ck["config"])
+    cfg.pop("flow_token_drop", None)  # per-token flow dropout, replaced by per-sample flow_drop before any run used it
+    model = S1Model(S1Config(**cfg)).to(dev)
     model.load_state_dict(ck["model"])
     model.eval()
     return model, {k: v.to(dev) for k, v in ck["norm"].items()}, ck
