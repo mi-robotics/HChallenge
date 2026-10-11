@@ -32,3 +32,9 @@ gym==0.26.2
 #   git clone https://github.com/facebookresearch/sam2 third_party/sam2  (commit 2b90b9f)
 #   SAM2_BUILD_CUDA=0 pip install --no-deps --no-build-isolation -e third_party/sam2 --config-settings editable_mode=compat
 #   checkpoint: https://dl.fbaipublicfiles.com/segment_anything_2/092824/sam2.1_hiera_large.pt -> third_party/sam2_ckpt/
+# Phase 6: world action model (wam/), Cosmos-Predict2-2B via diffusers + LoRA
+diffusers==0.41.0
+transformers==5.19.0
+peft==0.21.2
+accelerate==1.15.0
+sentencepiece==0.2.2

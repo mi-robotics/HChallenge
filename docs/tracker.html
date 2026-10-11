@@ -116,8 +116,8 @@ const PHASES = [
       ["Extract hand and cup flow for every episode, kept and failed", 1, "https://claude.ai/artifact/PAJedJ9vnrJQ7oHw1krUnc"], ["Split by episode into train / val / test; write data/README.md", 1, "https://claude.ai/artifact/TvbRNEzmd6fsjHTJrfEdtp"]] },
   { id: "p5", n: "5", name: "Flow → action policy", status: "active", goal: "Policy that turns action flow into robot actions in sim.",
     steps: [["Image-only S1 baseline (HVLA S1, no S2, no flow): two sim cameras + state → actions; eval in sim", 1, "https://claude.ai/artifact/JwjF8TnLrMYGWnn7JikdZr"], ["Build the flow-conditioned training dataset (flow, sim obs, actions on the robot's clock)", 2], ["Train the simple flow baseline (flow + state → actions)", 0], ["Train the main policy (flow + images + state)", 0], ["Evaluate in sim on held-out recorded flows", 0]] },
-  { id: "p6", n: "6", name: "Flow generator", status: "todo", goal: "Real photo + instruction → predicted hand flow.",
-    steps: [["Build the dataset: (image, instruction) → hand flow", 0], ["Train the simple version (frozen DINOv2 + text + head)", 0], ["Upgrade to diffusion only if predictions are averaged", 0], ["End-to-end test: photo → generator → policy → sim", 0]] },
+  { id: "p6", n: "6", name: "Flow generator", status: "active", goal: "Real photo + instruction → predicted future video and hand + mug flow (world action model, Cosmos-Predict2-2B + LoRA).",
+    steps: [["Dataset + fine-tuning code (wam/), smoke tests without the Cosmos weights", 1, "https://claude.ai/artifact/ELwY3yrtuRnmZh5oKnPoPS"], ["Train on the train split; predicted video + trails on val/test frames", 2], ["End-to-end test: photo → WAM → flow → policy → sim", 0]] },
   { id: "p7", n: "W", name: "Write-up", status: "todo", goal: "Short, specific, honest README for reviewers.",
     steps: [["Summary + hero GIF", 0], ["Pipeline diagram", 0], ["How to run", 0], ["Results tables", 0], ["Design choices and why", 0], ["What worked, what didn't, what's next", 0], ["Failure videos", 0]] },
 ];

@@ -251,19 +251,42 @@ Dropped after step 1.9. Offline replay of a recorded video already gets the sim 
 
 **Goal:** Train a model that looks at a real photo + instruction and predicts the hand action flow.
 
-### Model
+### Model (world action model, `wam/`)
 
-- **Inputs:** real image (first frame of an episode or current frame), instruction text
-- **Output:** hand action flow in the Phase 3 format
-- **Start simple:** frozen pretrained image encoder (e.g. DINOv2) + simple text embedding + small network that outputs the trails
-- **Upgrade if needed:** a small diffusion model over trails (handles cases with more than one valid way to do the task)
+- **Base:** Cosmos-Predict2-2B Video2World (`nvidia/Cosmos-Predict2-2B-Video2World`, diffusers format; gated, accept
+  the licence on Hugging Face), fine-tuned with LoRA (rank 64 on attention + MLP, 91.8M of 2,048M parameters).
+- **Inputs:** the current real frame (256 × 448) and the prompt "pick up the mug and put it on the plate" (T5).
+- **Outputs, jointly denoised:** the next 16 frames at 10 Hz (1.6 s) and the flow for the same 16 steps
+  (6 hand + 8 mug points, x y z in the table frame + visible = 896 numbers).
+- **Flow in the latent sequence** (the Cosmos Policy trick, arXiv 2601.16163): the 896 numbers are repeated
+  32× to fill one latent frame (16 × 32 × 56) and averaged back out. Latents: [frame now (given)] [4 latents =
+  16 future frames] [flow]. The flow frame is last so the causal VAE decodes the video without it.
+- **Data:** robot clock with the pauses (`video_sim.mp4` + `flow_sim.npz`), so the predicted flow is in the
+  policy's format and goes to the S1 policy unchanged.
+- Dropped: generate video then track it (scenario 1): the generated video has no depth, and our flow is 3D.
 
 ### Steps
 
-1. Build the dataset: (real image, instruction) → hand flow, from Phase 4.
-2. Train the simple version. Visualise predicted trails on test images.
-3. Upgrade only if predictions are blurry/averaged.
-4. **End-to-end test:** real photo → generator → flow → Phase 5 policy → sim robot.
+1. Build the dataset and the fine-tuning code (`wam/data.py`, `model.py`, `train.py`); smoke tests without the
+   Cosmos weights.
+2. Train on the train split; visualise predicted video + trails on val/test frames.
+3. **End-to-end test:** real photo → WAM → flow → Phase 5 policy (`full_wrist_state`) → sim robot, chunk by chunk
+   (each chunk starts from the last predicted frame).
+
+### Notes
+
+- **6.1** `wam/` (diffusers 0.41 `CosmosTransformer3DModel` + Wan2.1 VAE, peft LoRA; not NVIDIA's cosmos-policy
+  stack, which needs Docker + Megatron; cloned for reference to `third_party/cosmos-policy`, commit 18a2acc). Noise and parametrisation as diffusers' Cosmos2 Video2World pipeline
+  (x_t = (1 − t) x0 + t ε, t = σ/(1+σ), the network predicts ε − x0; given frame clean with t = 1e-4); training σ
+  lognormal(1.386, 1.2) as Cosmos Policy. Sample at step i: video frames i, i+2, …, i+32 and flow rows i … i+30
+  (same rows as the policy). Smoke tests (`wam/smoke.py`, no Cosmos weights): samples match the video/flow rows;
+  tile → untile error 5e-7; VAE round trip 41.1 dB PSNR; the recorded flow projected onto the 256 × 448 frames
+  sits on the hand and mug. Overfit on one batch of 4 with a 2-layer random transformer: flow loss 2.28 → 0.24,
+  sampled-flow error 85 → 44 mm in 1,500 steps. Full-size 2B (random weights, LoRA r64, gradient checkpointing,
+  bf16): batch 8 = 4.15 s/step, 13.3 GB (VAE encode 0.94 s of it; transformer 3.25 s); batch 16 = 6.6 s + VAE,
+  21.4 GB; without checkpointing batch 8 runs out of memory. Sampling one 1.6 s chunk: 2.2 s (20 steps), 1.1 s
+  (10 steps). 20k steps at batch 8 ≈ 23 h (≈ 18 h with the latents cached). Not run yet: real Cosmos weights (gated)
+  and the T5 prompt embedding (from the same repo).
 
 ### Evaluation
 
