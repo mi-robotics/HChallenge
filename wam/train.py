@@ -4,7 +4,12 @@ current frame and the prompt, on the robot's clock (wam/data.py, wam/model.py).
   python wam/train.py --out outputs/wam/v1
   python wam/train.py --base random-tiny --steps 300 --limit 2 --out outputs/wam/smoke   (no weights needed)
 
-Every --val-every steps: flow error of sampled flows on val samples (mm, median over points and steps).
+The VAE latents of every training sample are encoded once and cached (outputs/wam/cache_*.pt).
+Every --sample-every steps, on val episodes (out/samples/, out/samples.jsonl):
+  - flow error of sampled flows on --val-samples fixed val samples (mm, mean over points and steps),
+    and a video of the first 4: predicted frames + predicted flow | real frames + recorded flow;
+  - chained rollouts from the first frame of --rollouts val episodes, --chunks x 1.6 s (6 = 9.6 s): each chunk
+    starts from the last frame the previous chunk predicted.
 """
 import argparse
 import json
@@ -12,23 +17,34 @@ import sys
 import time
 from pathlib import Path
 
+import cv2
 import numpy as np
 import torch
 from peft import LoraConfig
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from data import FLOW_STEPS, PROMPT, Episodes, denormalise_flow, flow_stats, normalise_flow  # noqa: E402
+from data import FLOW_STEPS, PROMPT, STRIDE, Episodes, denormalise_flow, flow_stats, normalise_flow  # noqa: E402
 from model import (BASE_REPO, decode, encode, encode_prompt, load_transformer, load_vae, loss, sample,  # noqa: E402
                    tile_flow, untile_flow)
+from render import camera, overlay, write_mp4  # noqa: E402
 
 FLOW_DIM = FLOW_STEPS * 14 * 4
+CACHE = Path(__file__).resolve().parents[1] / "outputs" / "wam"
 
 
-def to_latents(vae, frames, flow, stats, device):
-    """uint8 frames [B, 17, H, W, 3], flow [B, 16, 14, 4] (table frame) -> x0 [B, 16, 6, h, w]."""
-    z = encode(vae, torch.from_numpy(frames).to(device))
-    f = torch.from_numpy(normalise_flow(flow, stats)).to(device).flatten(1)
-    return torch.cat([z, tile_flow(f, (z.shape[1], *z.shape[3:]))], 2)
+@torch.no_grad()
+def cache_latents(vae, eps, path, batch=16):
+    """Latents of every sample's 17 frames, [n_steps, 16, 5, h, w] bf16 on the CPU (80 train episodes: 4.2 GB)."""
+    if path.exists():
+        return torch.load(path)
+    out, t0 = [], time.time()
+    for k in range(0, len(eps.steps), batch):
+        frames = np.stack([eps.sample(*eps.steps[j])[0] for j in range(k, min(k + batch, len(eps.steps)))])
+        out.append(encode(vae, torch.from_numpy(frames).cuda()).bfloat16().cpu())
+    out = torch.cat(out)
+    torch.save(out, path)
+    print(f"cached {len(out)} latents in {time.time() - t0:.0f} s -> {path}", flush=True)
+    return out
 
 
 @torch.no_grad()
@@ -37,11 +53,37 @@ def predict(model, vae, frames_now, text, stats, steps=20, video=False):
     cond = encode(vae, frames_now)
     x = sample(model, cond, text, 6, steps)
     flow = denormalise_flow(untile_flow(x[:, :, -1:], FLOW_DIM).view(-1, FLOW_STEPS, 14, 4).cpu().numpy(), stats)
-    return flow, (decode(vae, x[:, :, :-1]) if video else None)
+    return flow, (decode(vae, x[:, :, :-1]).cpu().numpy() if video else None)
+
+
+@torch.no_grad()
+def rollout(model, vae, frame0, text, stats, chunks, steps=20):
+    """frame0 [H, W, 3] -> frames [1 + 16 chunks, H, W, 3], flow [16 chunks, 14, 4]. Each chunk starts from the last
+    frame the previous one predicted."""
+    frames, flows, now = [frame0], [], frame0
+    for _ in range(chunks):
+        flow, video = predict(model, vae, torch.from_numpy(now)[None, None].cuda(), text, stats, steps, video=True)
+        frames += list(video[0, 1:])
+        flows.append(flow[0])
+        now = video[0, -1]
+    return np.stack(frames), np.concatenate(flows)
 
 
 def flow_error_mm(pred, true):
-    return float(np.median(np.linalg.norm(pred[..., :3] - true[..., :3], axis=-1)) * 1000)
+    return float(np.mean(np.linalg.norm(pred[..., :3] - true[..., :3], axis=-1)) * 1000)
+
+
+def side_by_side(pred_frames, pred_flow, real_frames, real_flow, cam, label=""):
+    """Frame j shows the flow chunk it belongs to: frame 0 and frames 1-16 chunk 0, frames 17-32 chunk 1, ..."""
+    out = []
+    for j in range(len(pred_frames)):
+        c = max(j - 1, 0) // FLOW_STEPS
+        rows = slice(c * FLOW_STEPS, (c + 1) * FLOW_STEPS)
+        a, b = overlay(pred_frames[j], pred_flow[rows], cam), overlay(real_frames[j], real_flow[rows], cam)
+        for img, text in ((a, f"predicted {label}"), (b, f"real  t = {j / 10:.1f} s")):
+            cv2.putText(img, text, (8, 20), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 1, cv2.LINE_AA)
+        out.append(np.concatenate([a, b], 1))
+    return out
 
 
 def main():
@@ -54,13 +96,14 @@ def main():
     ap.add_argument("--lora-rank", type=int, default=64)
     ap.add_argument("--flow-weight", type=float, default=1.0)
     ap.add_argument("--limit", type=int, default=None, help="use only the first N episodes of each split")
-    ap.add_argument("--val-every", type=int, default=1000)
+    ap.add_argument("--sample-every", type=int, default=500)
     ap.add_argument("--val-samples", type=int, default=32)
-    ap.add_argument("--save-every", type=int, default=5000)
-    ap.add_argument("--fixed-batch", action="store_true", help="train on one batch (overfit check)")
+    ap.add_argument("--rollouts", type=int, default=4, help="val episodes rolled out from their first frame")
+    ap.add_argument("--chunks", type=int, default=6, help="chunks per rollout (6 x 1.6 s = 9.6 s)")
+    ap.add_argument("--save-every", type=int, default=2500)
     args = ap.parse_args()
     out, device = Path(args.out), "cuda"
-    out.mkdir(parents=True, exist_ok=True)
+    (out / "samples").mkdir(parents=True, exist_ok=True)
     torch.manual_seed(0)
     rng = np.random.default_rng(0)
 
@@ -69,11 +112,13 @@ def main():
     stats = flow_stats(train)
     print(f"data: {len(train.steps)} train / {len(val.steps)} val steps, loaded in {time.time() - t0:.0f} s", flush=True)
     vae = load_vae(device)
+    latents = cache_latents(vae, train, CACHE / f"cache_train_{len(train.steps)}.pt")
+    train_flow = torch.from_numpy(normalise_flow(np.stack([train.sample(e, i)[1] for e, i in train.steps]), stats))
     model = load_transformer(args.base).to(device)
     if args.base.startswith("random"):
         text = torch.randn(1, 512, 1024) * (torch.arange(512) < 12).view(1, -1, 1)  # stand-in for the T5 embedding
     else:
-        prompt_file = out.parent / "prompt_t5.pt"
+        prompt_file = CACHE / "prompt_t5.pt"
         if not prompt_file.exists():
             torch.save(encode_prompt(args.base, PROMPT, device), prompt_file)
         text = torch.load(prompt_file)
@@ -89,15 +134,48 @@ def main():
           flush=True)
     opt = torch.optim.AdamW(params, lr=args.lr, weight_decay=0.0)
     sched = torch.optim.lr_scheduler.LambdaLR(opt, lambda s: min(1, (s + 1) / 500))
+
     vi = np.random.default_rng(1).choice(len(val.steps), min(args.val_samples, len(val.steps)), replace=False)
-    val_frames, val_flow = map(np.stack, zip(*(val.sample(*val.steps[k]) for k in vi)))
-    fixed = train.batch(rng, args.batch) if args.fixed_batch else None
+    val_picks = [val.steps[k] for k in vi]
+    val_frames, val_flow = map(np.stack, zip(*(val.sample(e, i) for e, i in val_picks)))
+    cams = {e: camera(val.dirs[e]) for e in set([e for e, _ in val_picks[:4]] + list(range(min(args.rollouts, len(val.dirs)))))}
     (out / "config.json").write_text(json.dumps({**vars(args), "flow_stats": stats}, indent=1))
+
+    def evaluate(step):
+        model.eval()
+        t1, res = time.time(), {"step": step}
+        pred, video = [], []
+        for k in range(0, len(val_frames), 8):
+            f, v = predict(model, vae, torch.from_numpy(val_frames[k:k + 8, :1]).to(device), text, stats, video=k == 0)
+            pred.append(f)
+            if k == 0:
+                video = v
+        pred = np.concatenate(pred)
+        res["val_flow_mm"] = flow_error_mm(pred, val_flow)
+        res["hold_still_mm"] = flow_error_mm(val_flow[:, :1].repeat(FLOW_STEPS, 1), val_flow)
+        clips = [side_by_side(video[j], pred[j], val_frames[j], val_flow[j], cams[val_picks[j][0]]) for j in range(4)]
+        write_mp4(out / "samples" / f"{step:05d}_chunks.mp4", [np.concatenate(c, 0) for c in zip(*clips)], 10)
+        res["rollout_flow_mm"] = {}
+        for e in range(min(args.rollouts, len(val.dirs))):
+            frames, flow = rollout(model, vae, val.frames[e][0], text, stats, args.chunks)
+            rows = np.minimum(np.arange(0, STRIDE * len(flow) + 1, STRIDE), len(val.flow[e]) - 1)
+            real_frames, real_flow = val.frames[e][rows], val.flow[e][rows[:-1]]
+            res["rollout_flow_mm"][val.dirs[e].name] = flow_error_mm(flow, real_flow)
+            write_mp4(out / "samples" / f"{step:05d}_rollout_{val.dirs[e].name}.mp4",
+                      side_by_side(frames, flow, real_frames, real_flow, cams[e], f"step {step}"), 10)
+        res["eval_s"] = round(time.time() - t1)
+        print(f"step {step} val flow error {res['val_flow_mm']:.1f} mm (hold still: {res['hold_still_mm']:.1f} mm), "
+              f"9.6 s rollouts {np.median(list(res['rollout_flow_mm'].values())):.1f} mm, {res['eval_s']} s", flush=True)
+        with open(out / "samples.jsonl", "a") as fh:
+            fh.write(json.dumps(res) + "\n")
+        model.train()
 
     log, t0 = [], time.time()
     for step in range(1, args.steps + 1):
-        frames, flow = fixed or train.batch(rng, args.batch)
-        x0 = to_latents(vae, frames, flow, stats, device)
+        k = torch.from_numpy(rng.integers(len(train.steps), size=args.batch))
+        z = latents[k].to(device).float()
+        f = train_flow[k].to(device).flatten(1)
+        x0 = torch.cat([z, tile_flow(f, (z.shape[1], *z.shape[3:]))], 2)
         with torch.autocast("cuda", torch.bfloat16):
             total, l_video, l_flow = loss(model, x0, text, args.flow_weight)
         opt.zero_grad(set_to_none=True)
@@ -111,16 +189,8 @@ def main():
             print(f"step {step} loss {m[0]:.4f} video {m[1]:.4f} flow {m[2]:.4f} {(time.time() - t0) / 50:.2f} s/step "
                   f"mem {torch.cuda.max_memory_allocated() / 2**30:.1f} GB", flush=True)
             log, t0 = [], time.time()
-        if step % args.val_every == 0 or step == args.steps:
-            model.eval()
-            vf = fixed[0][:, :1] if args.fixed_batch else val_frames[:, :1]
-            true = fixed[1] if args.fixed_batch else val_flow
-            pred = np.concatenate([predict(model, vae, torch.from_numpy(vf[k:k + 8]).to(device), text, stats)[0]
-                                   for k in range(0, len(vf), 8)])
-            print(f"step {step} {'train-batch' if args.fixed_batch else 'val'} flow error {flow_error_mm(pred, true):.1f} mm "
-                  f"(predicting the current position for all 16 steps: {flow_error_mm(true[:, :1].repeat(16, 1), true):.1f} mm)",
-                  flush=True)
-            model.train()
+        if step % args.sample_every == 0 or step == args.steps:
+            evaluate(step)
             t0 = time.time()
         if step % args.save_every == 0 or step == args.steps:
             torch.save({k: v for k, v in model.state_dict().items() if "lora" in k}, out / f"lora_{step}.pt")

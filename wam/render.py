@@ -30,7 +30,7 @@ def overlay(frame, flow, cam):
     uv = cv2.projectPoints(pts[..., :3].reshape(-1, 3).astype(np.float64), rvec, t, K, dist)[0].reshape(14, -1, 2)
     img = np.ascontiguousarray(frame[..., ::-1])
     draw(img, uv * [w / w0, h / h0], pts[..., 3] > 0, HAND_COLOUR + [YELLOW] * 8, 6, scale=0.35)
-    return img[..., ::-1]
+    return np.ascontiguousarray(img[..., ::-1])
 
 
 def write_mp4(path, frames, fps):
