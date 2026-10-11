@@ -25,6 +25,7 @@ CONFIG_TINY = {**CONFIG_2B, "num_attention_heads": 4, "attention_head_dim": 64, 
 FPS = 10
 T_COND = 1e-4 / (1 + 1e-4)
 N_COND = 1  # latent frames given
+FLOW_DIM = 16 * 14 * 4  # flow steps x points x (x, y, z, visible)
 
 
 def load_transformer(base, dtype=torch.bfloat16):
@@ -98,17 +99,28 @@ def velocity(model, x_t, t, text):
     return out.float()
 
 
+def noise_like(x):
+    """Gaussian noise for the latents, except the flow frame (last): one draw of FLOW_DIM values tiled like the flow.
+    With independent noise per copy the model can denoise the flow by averaging its 32 copies (16 of them sit in
+    the same token) without looking at the image; at sampling time that average is ~0, i.e. the mean flow."""
+    eps = torch.randn_like(x)
+    eps[:, :, -1:] = tile_flow(torch.randn(x.shape[0], FLOW_DIM, device=x.device), (x.shape[1], *x.shape[3:]))
+    return eps
+
+
 def loss(model, x0, text, flow_weight=1.0):
-    """x0 [B, C, T, h, w]: clean latents with the flow in the last frame. Returns (total, video, flow) losses."""
+    """x0 [B, C, T, h, w]: clean latents with the flow in the last frame.
+    Returns (total, video, flow, flow_hi) losses; flow_hi = flow loss of the samples with sigma > 10 (nan if none)."""
     B = x0.shape[0]
     sigma = torch.exp(1.386 + 1.2 * torch.randn(B, device=x0.device))
     t = sigma / (1 + sigma)
-    eps = torch.randn_like(x0)
+    eps = noise_like(x0)
     x_t = (1 - t.view(B, 1, 1, 1, 1)) * x0 + t.view(B, 1, 1, 1, 1) * eps
     x_t[:, :, :N_COND] = x0[:, :, :N_COND]
     err = (velocity(model, x_t, t, text) - (eps - x0)) ** 2
-    video, flow = err[:, :, N_COND:-1].mean(), err[:, :, -1].mean()
-    return video + flow_weight * flow, video, flow
+    video, flow_b = err[:, :, N_COND:-1].mean(), err[:, :, -1].flatten(1).mean(1)
+    flow, flow_hi = flow_b.mean(), flow_b[sigma > 10].mean()
+    return video + flow_weight * flow, video, flow, flow_hi
 
 
 @torch.no_grad()
@@ -120,7 +132,7 @@ def sample(model, cond, text, n_latents, steps=5, sigma_max=80.0, sigma_min=4.0,
     r = torch.linspace(0, 1, steps, device=cond.device)
     sigmas = (sigma_max ** (1 / rho) + r * (sigma_min ** (1 / rho) - sigma_max ** (1 / rho))) ** rho
     ts = sigmas / (1 + sigmas)
-    x = torch.randn(B, C, n_latents, h, w, device=cond.device) * ts[0]  # x_t at t[0] with x0 ~ 0
+    x = noise_like(torch.empty(B, C, n_latents, h, w, device=cond.device)) * ts[0]  # x_t at t[0] with x0 ~ 0
     for i, t in enumerate(ts):
         x[:, :, :N_COND] = cond
         v = velocity(model, x, t.expand(B), text)

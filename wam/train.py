@@ -24,11 +24,10 @@ from peft import LoraConfig
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from data import FLOW_STEPS, PROMPT, STRIDE, Episodes, denormalise_flow, flow_stats, normalise_flow  # noqa: E402
-from model import (BASE_REPO, decode, encode, encode_prompt, load_transformer, load_vae, loss, sample,  # noqa: E402
-                   tile_flow, untile_flow)
+from model import (BASE_REPO, FLOW_DIM, decode, encode, encode_prompt, load_transformer, load_vae, loss,  # noqa: E402
+                   sample, tile_flow, untile_flow)
 from render import camera, overlay, write_mp4  # noqa: E402
 
-FLOW_DIM = FLOW_STEPS * 14 * 4
 CACHE = Path(__file__).resolve().parents[1] / "outputs" / "wam"
 
 
@@ -196,16 +195,17 @@ def main():
         f = train_flow[k].to(device).flatten(1)
         x0 = torch.cat([z, tile_flow(f, (z.shape[1], *z.shape[3:]))], 2)
         with torch.autocast("cuda", torch.bfloat16):
-            total, l_video, l_flow = loss(model, x0, text, args.flow_weight)
+            total, l_video, l_flow, l_flow_hi = loss(model, x0, text, args.flow_weight)
         opt.zero_grad(set_to_none=True)
         total.backward()
         torch.nn.utils.clip_grad_norm_(params, 1.0)
         opt.step()
         sched.step()
-        log.append((total.item(), l_video.item(), l_flow.item()))
+        log.append((total.item(), l_video.item(), l_flow.item(), l_flow_hi.item()))
         if step % 50 == 0:
-            m = np.mean(log, 0)
-            print(f"step {step} loss {m[0]:.4f} video {m[1]:.4f} flow {m[2]:.4f} {(time.time() - t0) / 50:.2f} s/step "
+            m = np.nanmean(log, 0)
+            print(f"step {step} loss {m[0]:.4f} video {m[1]:.4f} flow {m[2]:.4f} flow_hi {m[3]:.4f} "
+                  f"{(time.time() - t0) / 50:.2f} s/step "
                   f"mem {torch.cuda.max_memory_allocated() / 2**30:.1f} GB", flush=True)
             log, t0 = [], time.time()
         if step % args.sample_every == 0 or step == args.steps:
