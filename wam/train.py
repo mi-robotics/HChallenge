@@ -47,8 +47,28 @@ def cache_latents(vae, eps, path, batch=16):
     return out
 
 
+def prompt_embedding(base, device):
+    if base.startswith("random"):
+        return (torch.randn(1, 512, 1024) * (torch.arange(512) < 12).view(1, -1, 1)).to(device)  # stand-in for T5
+    prompt_file = CACHE / "prompt_t5.pt"
+    if not prompt_file.exists():
+        torch.save(encode_prompt(base, PROMPT, device), prompt_file)
+    return torch.load(prompt_file).to(device)
+
+
+def add_lora(model, rank):
+    """Freeze the model, add LoRA to attention + MLP; returns the trainable (float32) parameters."""
+    model.requires_grad_(False)
+    model.add_adapter(LoraConfig(r=rank, lora_alpha=rank, init_lora_weights=True,
+                                 target_modules=["to_q", "to_k", "to_v", "to_out.0", "ff.net.0.proj", "ff.net.2"]))
+    params = [p for p in model.parameters() if p.requires_grad]
+    for p in params:
+        p.data = p.data.float()
+    return params
+
+
 @torch.no_grad()
-def predict(model, vae, frames_now, text, stats, steps=20, video=False):
+def predict(model, vae, frames_now, text, stats, steps=5, video=False):
     """frames_now [B, 1, H, W, 3] uint8 -> flow [B, 16, 14, 4] (table frame) and, if video, frames [B, 17, H, W, 3]."""
     cond = encode(vae, frames_now)
     x = sample(model, cond, text, 6, steps)
@@ -57,7 +77,7 @@ def predict(model, vae, frames_now, text, stats, steps=20, video=False):
 
 
 @torch.no_grad()
-def rollout(model, vae, frame0, text, stats, chunks, steps=20):
+def rollout(model, vae, frame0, text, stats, chunks, steps=5):
     """frame0 [H, W, 3] -> frames [1 + 16 chunks, H, W, 3], flow [16 chunks, 14, 4]. Each chunk starts from the last
     frame the previous one predicted."""
     frames, flows, now = [frame0], [], frame0
@@ -86,6 +106,50 @@ def side_by_side(pred_frames, pred_flow, real_frames, real_flow, cam, label=""):
     return out
 
 
+class ValSet:
+    """Fixed val samples (seed 1) and the val episodes rolled out from their first frame."""
+
+    def __init__(self, val, n_samples, n_rollouts):
+        self.val = val
+        vi = np.random.default_rng(1).choice(len(val.steps), min(n_samples, len(val.steps)), replace=False)
+        self.picks = [val.steps[k] for k in vi]
+        self.frames, self.flow = map(np.stack, zip(*(val.sample(e, i) for e, i in self.picks)))
+        self.rollouts = list(range(min(n_rollouts, len(val.dirs))))
+        self.cams = {e: camera(val.dirs[e]) for e in set([e for e, _ in self.picks[:4]] + self.rollouts)}
+
+
+def evaluate(model, vae, text, stats, vs, out, step, chunks, steps=5, batch=8):
+    """Writes out/samples/<step>_chunks.mp4, <step>_rollout_<episode>.mp4 and a line in out/samples.jsonl."""
+    model.eval()
+    (out / "samples").mkdir(parents=True, exist_ok=True)
+    t1, res = time.time(), {"step": step, "sampler_steps": steps}
+    pred, video = [], None
+    for k in range(0, len(vs.frames), batch):
+        f, v = predict(model, vae, torch.from_numpy(vs.frames[k:k + batch, :1]).cuda(), text, stats, steps, video=k == 0)
+        pred.append(f)
+        video = v if k == 0 else video
+    pred = np.concatenate(pred)
+    res["val_flow_mm"] = flow_error_mm(pred, vs.flow)
+    res["hold_still_mm"] = flow_error_mm(vs.flow[:, :1].repeat(FLOW_STEPS, 1), vs.flow)
+    clips = [side_by_side(video[j], pred[j], vs.frames[j], vs.flow[j], vs.cams[vs.picks[j][0]]) for j in range(4)]
+    write_mp4(out / "samples" / f"{step:05d}_chunks.mp4", [np.concatenate(c, 0) for c in zip(*clips)], 10)
+    res["rollout_flow_mm"] = {}
+    val = vs.val
+    for e in vs.rollouts:
+        frames, flow = rollout(model, vae, val.frames[e][0], text, stats, chunks, steps)
+        rows = np.minimum(np.arange(0, STRIDE * len(flow) + 1, STRIDE), len(val.flow[e]) - 1)
+        real_frames, real_flow = val.frames[e][rows], val.flow[e][rows[:-1]]
+        res["rollout_flow_mm"][val.dirs[e].name] = flow_error_mm(flow, real_flow)
+        write_mp4(out / "samples" / f"{step:05d}_rollout_{val.dirs[e].name}.mp4",
+                  side_by_side(frames, flow, real_frames, real_flow, vs.cams[e], f"step {step}"), 10)
+    res["eval_s"] = round(time.time() - t1)
+    print(f"step {step} val flow error {res['val_flow_mm']:.1f} mm (hold still: {res['hold_still_mm']:.1f} mm), "
+          f"9.6 s rollouts {np.mean(list(res['rollout_flow_mm'].values())):.1f} mm, {res['eval_s']} s", flush=True)
+    with open(out / "samples.jsonl", "a") as fh:
+        fh.write(json.dumps(res) + "\n")
+    model.train()
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--base", default=BASE_REPO, help='diffusers repo/folder, or "random-2b" / "random-tiny"')
@@ -103,7 +167,7 @@ def main():
     ap.add_argument("--save-every", type=int, default=2500)
     args = ap.parse_args()
     out, device = Path(args.out), "cuda"
-    (out / "samples").mkdir(parents=True, exist_ok=True)
+    out.mkdir(parents=True, exist_ok=True)
     torch.manual_seed(0)
     rng = np.random.default_rng(0)
 
@@ -115,60 +179,15 @@ def main():
     latents = cache_latents(vae, train, CACHE / f"cache_train_{len(train.steps)}.pt")
     train_flow = torch.from_numpy(normalise_flow(np.stack([train.sample(e, i)[1] for e, i in train.steps]), stats))
     model = load_transformer(args.base).to(device)
-    if args.base.startswith("random"):
-        text = torch.randn(1, 512, 1024) * (torch.arange(512) < 12).view(1, -1, 1)  # stand-in for the T5 embedding
-    else:
-        prompt_file = CACHE / "prompt_t5.pt"
-        if not prompt_file.exists():
-            torch.save(encode_prompt(args.base, PROMPT, device), prompt_file)
-        text = torch.load(prompt_file)
-    text = text.to(device)
-    model.requires_grad_(False)
-    model.add_adapter(LoraConfig(r=args.lora_rank, lora_alpha=args.lora_rank, init_lora_weights=True,
-                                 target_modules=["to_q", "to_k", "to_v", "to_out.0", "ff.net.0.proj", "ff.net.2"]))
-    params = [p for p in model.parameters() if p.requires_grad]
-    for p in params:
-        p.data = p.data.float()
+    text = prompt_embedding(args.base, device)
+    params = add_lora(model, args.lora_rank)
     model.enable_gradient_checkpointing()
     print(f"trainable {sum(p.numel() for p in params) / 1e6:.1f}M of {sum(p.numel() for p in model.parameters()) / 1e6:.0f}M",
           flush=True)
     opt = torch.optim.AdamW(params, lr=args.lr, weight_decay=0.0)
     sched = torch.optim.lr_scheduler.LambdaLR(opt, lambda s: min(1, (s + 1) / 500))
-
-    vi = np.random.default_rng(1).choice(len(val.steps), min(args.val_samples, len(val.steps)), replace=False)
-    val_picks = [val.steps[k] for k in vi]
-    val_frames, val_flow = map(np.stack, zip(*(val.sample(e, i) for e, i in val_picks)))
-    cams = {e: camera(val.dirs[e]) for e in set([e for e, _ in val_picks[:4]] + list(range(min(args.rollouts, len(val.dirs)))))}
+    vs = ValSet(val, args.val_samples, args.rollouts)
     (out / "config.json").write_text(json.dumps({**vars(args), "flow_stats": stats}, indent=1))
-
-    def evaluate(step):
-        model.eval()
-        t1, res = time.time(), {"step": step}
-        pred, video = [], []
-        for k in range(0, len(val_frames), 8):
-            f, v = predict(model, vae, torch.from_numpy(val_frames[k:k + 8, :1]).to(device), text, stats, video=k == 0)
-            pred.append(f)
-            if k == 0:
-                video = v
-        pred = np.concatenate(pred)
-        res["val_flow_mm"] = flow_error_mm(pred, val_flow)
-        res["hold_still_mm"] = flow_error_mm(val_flow[:, :1].repeat(FLOW_STEPS, 1), val_flow)
-        clips = [side_by_side(video[j], pred[j], val_frames[j], val_flow[j], cams[val_picks[j][0]]) for j in range(4)]
-        write_mp4(out / "samples" / f"{step:05d}_chunks.mp4", [np.concatenate(c, 0) for c in zip(*clips)], 10)
-        res["rollout_flow_mm"] = {}
-        for e in range(min(args.rollouts, len(val.dirs))):
-            frames, flow = rollout(model, vae, val.frames[e][0], text, stats, args.chunks)
-            rows = np.minimum(np.arange(0, STRIDE * len(flow) + 1, STRIDE), len(val.flow[e]) - 1)
-            real_frames, real_flow = val.frames[e][rows], val.flow[e][rows[:-1]]
-            res["rollout_flow_mm"][val.dirs[e].name] = flow_error_mm(flow, real_flow)
-            write_mp4(out / "samples" / f"{step:05d}_rollout_{val.dirs[e].name}.mp4",
-                      side_by_side(frames, flow, real_frames, real_flow, cams[e], f"step {step}"), 10)
-        res["eval_s"] = round(time.time() - t1)
-        print(f"step {step} val flow error {res['val_flow_mm']:.1f} mm (hold still: {res['hold_still_mm']:.1f} mm), "
-              f"9.6 s rollouts {np.median(list(res['rollout_flow_mm'].values())):.1f} mm, {res['eval_s']} s", flush=True)
-        with open(out / "samples.jsonl", "a") as fh:
-            fh.write(json.dumps(res) + "\n")
-        model.train()
 
     log, t0 = [], time.time()
     for step in range(1, args.steps + 1):
@@ -190,7 +209,9 @@ def main():
                   f"mem {torch.cuda.max_memory_allocated() / 2**30:.1f} GB", flush=True)
             log, t0 = [], time.time()
         if step % args.sample_every == 0 or step == args.steps:
-            evaluate(step)
+            lora = {k: v for k, v in model.state_dict().items() if "lora" in k}
+            torch.save(lora, out / "lora_latest.pt")  # overwritten each time (370 MB); wam/sample.py can re-sample it
+            evaluate(model, vae, text, stats, vs, out, step, args.chunks)
             t0 = time.time()
         if step % args.save_every == 0 or step == args.steps:
             torch.save({k: v for k, v in model.state_dict().items() if "lora" in k}, out / f"lora_{step}.pt")

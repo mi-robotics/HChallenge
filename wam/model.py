@@ -112,13 +112,18 @@ def loss(model, x0, text, flow_weight=1.0):
 
 
 @torch.no_grad()
-def sample(model, cond, text, n_latents, steps=20, sigma_max=80.0):
-    """cond [B, C, N_COND, h, w] clean latents -> [B, C, n_latents, h, w], Euler steps evenly spaced in t."""
+def sample(model, cond, text, n_latents, steps=5, sigma_max=80.0, sigma_min=4.0, rho=7.0):
+    """cond [B, C, N_COND, h, w] clean latents -> [B, C, n_latents, h, w]. As Cosmos Policy's action sampling:
+    Karras sigmas from sigma_max to sigma_min (rho 7), Euler between them, then the clean estimate
+    x0 = x_t - t v at sigma_min (steps model calls in total)."""
     B, C, _, h, w = cond.shape
-    ts = torch.linspace(sigma_max / (1 + sigma_max), 0, steps + 1, device=cond.device)
-    x = torch.randn(B, C, n_latents, h, w, device=cond.device)
-    for t, t_next in zip(ts[:-1], ts[1:]):
+    r = torch.linspace(0, 1, steps, device=cond.device)
+    sigmas = (sigma_max ** (1 / rho) + r * (sigma_min ** (1 / rho) - sigma_max ** (1 / rho))) ** rho
+    ts = sigmas / (1 + sigmas)
+    x = torch.randn(B, C, n_latents, h, w, device=cond.device) * ts[0]  # x_t at t[0] with x0 ~ 0
+    for i, t in enumerate(ts):
         x[:, :, :N_COND] = cond
-        x = x + (t_next - t) * velocity(model, x, t.expand(B), text)
+        v = velocity(model, x, t.expand(B), text)
+        x = x - t * v if i == steps - 1 else x + (ts[i + 1] - t) * v
     x[:, :, :N_COND] = cond
     return x
