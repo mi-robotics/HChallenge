@@ -75,7 +75,7 @@ simple sim (LIBERO / robosuite). Submitted as a public GitHub repo with a README
 
 ## Repo
 
-- Remote: `git@github.com:mi-robotics/HumanoidsChallenge.git` (branch `main`).
+- Remote: `git@github.com:mi-robotics/HChallenge.git` (branch `main`).
 - Don't commit large data or videos (`data/`, raw recordings). Step outputs (videos, images) go in `media/phase<N>/task<M>/` and are committed.
 
 ## Artifacts
