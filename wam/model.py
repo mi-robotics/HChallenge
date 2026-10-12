@@ -1,18 +1,19 @@
 """World action model: Cosmos-Predict2-2B Video2World with the flow written into one extra latent frame (the
 Cosmos Policy trick, arXiv 2601.16163: a small vector is tiled to fill a latent frame and averaged back out).
 
-Latent sequence (Wan2.1 VAE: frame 0 -> 1 latent, then 4 frames -> 1 latent; 8x smaller in H and W):
-  [0]    frame now                            given (clean)
-  [1-4]  16 future frames at 10 Hz (1.6 s)    predicted
-  [5]    flow, 16 steps x 14 points x 4       predicted
-The flow frame is last so the VAE (causal in time) decodes the video latents without it.
+Latent sequence (Wan2.1 VAE: frame 0 -> 1 latent, then 4 frames -> 1 latent; 8x smaller in H and W), see Layout:
+  [0]    frame now                                     given (clean)
+  [1-4]  16 future frames at 10 Hz (1.6 s)             predicted
+  [5]    flow, 16 steps x 14 points x 4 (optional)     predicted
+  [6]    flow state now, 14 points x 4 (optional)      given or predicted
+Flow and state come after the video so the video keeps the temporal positions it was pretrained with and the VAE
+(causal in time) decodes the video latents without them.
 
 Noise and parametrisation follow diffusers' Cosmos2VideoToWorldPipeline: x_t = (1 - t) x0 + t eps with
 t = sigma / (1 + sigma); the transformer outputs v = eps - x0, so x0 = x_t - t v. Conditioning frames are passed
 clean with t = 1e-4 / (1 + 1e-4) and condition_mask = 1. Training draws sigma ~ lognormal(1.386, 1.2) (Cosmos Policy).
 """
 import torch
-import torch.nn.functional as F
 from diffusers import AutoencoderKLWan, CosmosTransformer3DModel
 
 VAE_REPO = "Wan-AI/Wan2.1-T2V-1.3B-Diffusers"  # the Wan2.1 VAE that Cosmos-Predict2 uses; not gated
@@ -24,8 +25,19 @@ CONFIG_2B = dict(in_channels=17, out_channels=16, num_attention_heads=16, attent
 CONFIG_TINY = {**CONFIG_2B, "num_attention_heads": 4, "attention_head_dim": 64, "num_layers": 2, "adaln_lora_dim": 64}
 FPS = 10
 T_COND = 1e-4 / (1 + 1e-4)
-N_COND = 1  # latent frames given
 FLOW_DIM = 16 * 14 * 4  # flow steps x points x (x, y, z, visible)
+STATE_DIM = 14 * 4  # the flow's current row
+
+
+class Layout:
+    """Which latent frame holds what. v1: Layout(); video only: Layout(flow=False); with state: Layout(state=True)."""
+
+    def __init__(self, flow=True, state=False):
+        self.video_idx = [1, 2, 3, 4]
+        self.flow_idx = 5 if flow else None
+        self.state_idx = 5 + flow if state else None
+        self.T = 5 + flow + state
+        self.tiled = {i: d for i, d in ((self.flow_idx, FLOW_DIM), (self.state_idx, STATE_DIM)) if i is not None}
 
 
 def load_transformer(base, dtype=torch.bfloat16):
@@ -85,13 +97,12 @@ def untile_flow(latent, D):
     return flat[:, :k * D].view(-1, k, D).mean(1)
 
 
-def velocity(model, x_t, t, text):
-    """x_t [B, C, T, h, w] with the first N_COND frames clean, t [B] noise level of the other frames."""
+def velocity(model, x_t, t, text, given):
+    """x_t [B, C, T, h, w] with the given frames clean, t [B] noise level of the others, given [B, T] bool."""
     B, _, T, h, w = x_t.shape
-    timestep = t.view(B, 1, 1, 1, 1).expand(B, 1, T, 1, 1).clone()
-    timestep[:, :, :N_COND] = T_COND
-    cond_mask = torch.zeros(B, 1, T, h, w, device=x_t.device)
-    cond_mask[:, :, :N_COND] = 1
+    g = given.view(B, 1, T, 1, 1).float()
+    timestep = g * T_COND + (1 - g) * t.view(B, 1, 1, 1, 1)
+    cond_mask = g.expand(B, 1, T, h, w)
     dtype = next(model.parameters()).dtype
     out = model(hidden_states=x_t.to(dtype), timestep=timestep.to(dtype), encoder_hidden_states=text.to(dtype).expand(B, -1, -1),
                 fps=FPS, condition_mask=cond_mask.to(dtype), padding_mask=x_t.new_zeros(1, 1, h, w, dtype=dtype),
@@ -99,43 +110,57 @@ def velocity(model, x_t, t, text):
     return out.float()
 
 
-def noise_like(x):
-    """Gaussian noise for the latents, except the flow frame (last): one draw of FLOW_DIM values tiled like the flow.
+def noise_like(x, layout):
+    """Gaussian noise for the latents, except the tiled frames (flow, state): one draw of D values tiled like the data.
     With independent noise per copy the model can denoise the flow by averaging its 32 copies (16 of them sit in
     the same token) without looking at the image; at sampling time that average is ~0, i.e. the mean flow."""
     eps = torch.randn_like(x)
-    eps[:, :, -1:] = tile_flow(torch.randn(x.shape[0], FLOW_DIM, device=x.device), (x.shape[1], *x.shape[3:]))
+    for i, D in layout.tiled.items():
+        eps[:, :, i:i + 1] = tile_flow(torch.randn(x.shape[0], D, device=x.device), (x.shape[1], *x.shape[3:]))
     return eps
 
 
-def loss(model, x0, text, flow_weight=1.0):
-    """x0 [B, C, T, h, w]: clean latents with the flow in the last frame.
-    Returns (total, video, flow, flow_hi) losses; flow_hi = flow loss of the samples with sigma > 10 (nan if none)."""
+def loss(model, x0, text, layout, given, flow_weight=1.0):
+    """x0 [B, C, T, h, w] clean latents in `layout`, given [B, T] bool (frames passed clean, no loss).
+    Returns a dict: total, video, flow, flow_hi (flow loss of the samples with sigma > 10), state (state frames
+    that were predicted); nan where a term has no frames."""
     B = x0.shape[0]
     sigma = torch.exp(1.386 + 1.2 * torch.randn(B, device=x0.device))
     t = sigma / (1 + sigma)
-    eps = noise_like(x0)
-    x_t = (1 - t.view(B, 1, 1, 1, 1)) * x0 + t.view(B, 1, 1, 1, 1) * eps
-    x_t[:, :, :N_COND] = x0[:, :, :N_COND]
-    err = (velocity(model, x_t, t, text) - (eps - x0)) ** 2
-    video, flow_b = err[:, :, N_COND:-1].mean(), err[:, :, -1].flatten(1).mean(1)
-    flow, flow_hi = flow_b.mean(), flow_b[sigma > 10].mean()
-    return video + flow_weight * flow, video, flow, flow_hi
+    eps = noise_like(x0, layout)
+    g = given.view(B, 1, -1, 1, 1)
+    x_t = torch.where(g, x0, (1 - t.view(B, 1, 1, 1, 1)) * x0 + t.view(B, 1, 1, 1, 1) * eps)
+    err = ((velocity(model, x_t, t, text, given) - (eps - x0)) ** 2).mean((1, 3, 4))  # [B, T]
+    nan = x0.new_tensor(float("nan"))
+    out = {"video": err[:, layout.video_idx].mean(), "flow": nan, "flow_hi": nan, "state": nan}
+    total = out["video"]
+    if layout.flow_idx is not None:
+        flow_b = err[:, layout.flow_idx]
+        out["flow"], out["flow_hi"] = flow_b.mean(), flow_b[sigma > 10].mean()
+        total = total + flow_weight * out["flow"]
+    if layout.state_idx is not None:
+        free = ~given[:, layout.state_idx]
+        if free.any():
+            out["state"] = err[free, layout.state_idx].mean()
+            total = total + flow_weight * out["state"] * free.float().mean()
+    out["total"] = total
+    return out
 
 
 @torch.no_grad()
-def sample(model, cond, text, n_latents, steps=5, sigma_max=80.0, sigma_min=4.0, rho=7.0):
-    """cond [B, C, N_COND, h, w] clean latents -> [B, C, n_latents, h, w]. As Cosmos Policy's action sampling:
-    Karras sigmas from sigma_max to sigma_min (rho 7), Euler between them, then the clean estimate
-    x0 = x_t - t v at sigma_min (steps model calls in total)."""
-    B, C, _, h, w = cond.shape
-    r = torch.linspace(0, 1, steps, device=cond.device)
+def sample(model, x_given, given, text, layout, steps=5, sigma_max=80.0, sigma_min=4.0, rho=7.0):
+    """x_given [B, C, T, h, w] with the given frames filled in (the rest is ignored), given [B, T] bool ->
+    [B, C, T, h, w]. Karras sigmas from sigma_max to sigma_min (rho 7), Euler between them, then the clean estimate
+    x0 = x_t - t v at sigma_min (steps model calls). Default = Cosmos Policy's action sampling; sigma_min=0.002 with
+    15-35 steps is the full video schedule (sharper moving hand, ~3-6x slower)."""
+    B = x_given.shape[0]
+    r = torch.linspace(0, 1, steps, device=x_given.device)
     sigmas = (sigma_max ** (1 / rho) + r * (sigma_min ** (1 / rho) - sigma_max ** (1 / rho))) ** rho
     ts = sigmas / (1 + sigmas)
-    x = noise_like(torch.empty(B, C, n_latents, h, w, device=cond.device)) * ts[0]  # x_t at t[0] with x0 ~ 0
+    g = given.view(B, 1, -1, 1, 1)
+    x = noise_like(torch.empty_like(x_given), layout) * ts[0]  # x_t at t[0] with x0 ~ 0
     for i, t in enumerate(ts):
-        x[:, :, :N_COND] = cond
-        v = velocity(model, x, t.expand(B), text)
+        x = torch.where(g, x_given, x)
+        v = velocity(model, x, t.expand(B), text, given)
         x = x - t * v if i == steps - 1 else x + (ts[i + 1] - t) * v
-    x[:, :, :N_COND] = cond
-    return x
+    return torch.where(g, x_given, x)

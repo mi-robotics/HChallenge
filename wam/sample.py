@@ -11,7 +11,7 @@ import torch
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from data import Episodes  # noqa: E402
-from model import load_transformer, load_vae  # noqa: E402
+from model import Layout, load_transformer, load_vae  # noqa: E402
 from train import ValSet, add_lora, evaluate, prompt_embedding  # noqa: E402
 
 
@@ -19,6 +19,7 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("ckpt")
     ap.add_argument("--steps", type=int, default=5, help="sampler steps (model calls per chunk)")
+    ap.add_argument("--sigma-min", type=float, default=4.0, help="last noise level (4 = Cosmos Policy actions, 0.002 = full)")
     ap.add_argument("--out", default=None, help="default: <run>/resample")
     ap.add_argument("--batch", type=int, default=4)
     args = ap.parse_args()
@@ -38,8 +39,10 @@ def main():
         step = json.loads((ckpt.parent / "samples.jsonl").read_text().splitlines()[-1])["step"]
     else:
         step = int(ckpt.stem.split("_")[1])
+    layout = Layout(flow=not cfg.get("video_only", False), state=cfg.get("state_p", 0) > 0)
     with torch.autocast("cuda", torch.bfloat16):
-        evaluate(model, vae, text, cfg["flow_stats"], vs, out, step, cfg["chunks"], args.steps, args.batch)
+        evaluate(model, vae, text, cfg["flow_stats"], vs, out, step, cfg["chunks"], layout,
+                 dict(steps=args.steps, sigma_min=args.sigma_min), args.batch)
 
 
 if __name__ == "__main__":
