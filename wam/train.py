@@ -260,10 +260,11 @@ def main():
         torch.nn.utils.clip_grad_norm_(params, 1.0)
         opt.step()
         sched.step()
-        log.append([l[n].item() for n in ("total", "video", "flow", "flow_hi", "state")])
+        log.append([l[n].item() for n in ("total", "video", "flow", "flow_hi", "state", "flow_free", "flow_given")])
         if step % 50 == 0:
             m = np.nanmean(log, 0)
             print(f"step {step} loss {m[0]:.4f} video {m[1]:.4f} flow {m[2]:.4f} flow_hi {m[3]:.4f} state {m[4]:.4f} "
+                  f"flow_free {m[5]:.4f} flow_given {m[6]:.4f} "
                   f"{(time.time() - t0) / 50:.2f} s/step "
                   f"mem {torch.cuda.max_memory_allocated() / 2**30:.1f} GB", flush=True)
             log, t0 = [], time.time()

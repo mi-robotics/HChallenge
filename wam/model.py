@@ -123,7 +123,8 @@ def noise_like(x, layout):
 def loss(model, x0, text, layout, given, flow_weight=1.0):
     """x0 [B, C, T, h, w] clean latents in `layout`, given [B, T] bool (frames passed clean, no loss).
     Returns a dict: total, video, flow, flow_hi (flow loss of the samples with sigma > 10), state (state frames
-    that were predicted); nan where a term has no frames."""
+    that were predicted), flow_free / flow_given (flow loss of the samples whose state was predicted / given);
+    nan where a term has no frames."""
     B = x0.shape[0]
     sigma = torch.exp(1.386 + 1.2 * torch.randn(B, device=x0.device))
     t = sigma / (1 + sigma)
@@ -132,7 +133,8 @@ def loss(model, x0, text, layout, given, flow_weight=1.0):
     x_t = torch.where(g, x0, (1 - t.view(B, 1, 1, 1, 1)) * x0 + t.view(B, 1, 1, 1, 1) * eps)
     err = ((velocity(model, x_t, t, text, given) - (eps - x0)) ** 2).mean((1, 3, 4))  # [B, T]
     nan = x0.new_tensor(float("nan"))
-    out = {"video": err[:, layout.video_idx].mean(), "flow": nan, "flow_hi": nan, "state": nan}
+    out = {k: nan for k in ("flow", "flow_hi", "state", "flow_free", "flow_given")}
+    out["video"] = err[:, layout.video_idx].mean()
     total = out["video"]
     if layout.flow_idx is not None:
         flow_b = err[:, layout.flow_idx]
@@ -140,6 +142,8 @@ def loss(model, x0, text, layout, given, flow_weight=1.0):
         total = total + flow_weight * out["flow"]
     if layout.state_idx is not None:
         free = ~given[:, layout.state_idx]
+        if layout.flow_idx is not None:
+            out["flow_free"], out["flow_given"] = flow_b[free].mean(), flow_b[~free].mean()
         if free.any():
             out["state"] = err[free, layout.state_idx].mean()
             total = total + flow_weight * out["state"] * free.float().mean()
