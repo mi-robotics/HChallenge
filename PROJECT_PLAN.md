@@ -315,6 +315,7 @@ Keep it short, specific, and honest. Reviewers explicitly said no AI slop.
 - [ ] Design choices and **why**
 - [ ] What worked, what didn't, and what I'd do next
 - [ ] Failure videos, not just successes
+- [ ] Project site on GitHub Pages (`site/`: Overview, Data, Policy, WAM, Code; deployed by `.github/workflows/pages.yml`). Skeleton with empty pages done; content to come
 
 ---
 
