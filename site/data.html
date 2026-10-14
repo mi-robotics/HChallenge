@@ -27,28 +27,64 @@
     <h1>Recording my hand and turning it into action flow</h1>
   </header>
 
-  <section id="setup">
-    <h2>Setup: D405 camera and table marker</h2>
+  <nav class="toc" aria-label="On this page">
+    <h2>Contents</h2>
+    <ol>
+      <li><a href="#overview">Overview</a></li>
+      <li><a href="#environment-setup">Environment setup</a></li>
+      <li><a href="#real2sim">Real2sim</a></li>
+      <li><a href="#action-flows">Action flows</a></li>
+      <li><a href="#data-splits">Data splits</a></li>
+      <li><a href="#third-party-dependencies">Third-party dependencies</a></li>
+      <li><a href="#limitations">Limitations</a></li>
+    </ol>
+  </nav>
+
+  <section id="overview">
+    <h2>Overview</h2>
+    <p>The data process produces a paired dataset: object manipulation demonstrations recorded in the real world, each
+    paired with a simulated robot trajectory.</p>
+    <figure class="diagram">
+      <div class="scroll">
+        <svg viewBox="0 0 1044 486.0" role="img" aria-labelledby="pipeline-title">
+          <title id="pipeline-title">Data pipeline in two rows: setup, calibrate, record; then an action flow branch and a real2sim branch (hand path, retarget, sim replay, success check) that join on the robot's clock before the data splits</title>
+          <defs><marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" class="ah"/></marker></defs>
+          <g class="node"><rect x="40" y="8" width="146" height="104" rx="6"/><text class="t" x="113.0" y="41.0">Setup</text><text class="s" x="113.0" y="60.0">D405 camera</text><text class="s" x="113.0" y="76.0">+ ArUco marker</text><text class="s" x="113.0" y="92.0">on the table</text></g><g class="node"><rect x="210" y="8" width="146" height="104" rx="6"/><text class="t" x="283.0" y="41.0">Calibrate</text><text class="s" x="283.0" y="60.0">intrinsics checked</text><text class="s" x="283.0" y="76.0">marker pose =</text><text class="s" x="283.0" y="92.0">table frame</text></g><g class="node"><rect x="380" y="8" width="146" height="104" rx="6"/><text class="t" x="453.0" y="33.0">Record</text><text class="s" x="453.0" y="52.0">my hand moves</text><text class="s" x="453.0" y="68.0">the mug onto</text><text class="s" x="453.0" y="84.0">the plate</text><text class="s" x="453.0" y="100.0">165 episodes</text></g><path class="edge" d="M186 60.0 L208 60.0" marker-end="url(#ah)"/><path class="edge" d="M356 60.0 L378 60.0" marker-end="url(#ah)"/><g class="node"><rect x="40" y="350.0" width="146" height="104" rx="6"/><text class="t" x="113.0" y="375.0">Hand path</text><text class="s" x="113.0" y="394.0">MediaPipe hand</text><text class="s" x="113.0" y="410.0">+ depth → pinch;</text><text class="s" x="113.0" y="426.0">mug and plate</text><text class="s" x="113.0" y="442.0">from grasp/release</text></g><g class="node"><rect x="210" y="350.0" width="146" height="104" rx="6"/><text class="t" x="283.0" y="383.0">Retarget</text><text class="s" x="283.0" y="402.0">pinch → gripper,</text><text class="s" x="283.0" y="418.0">rim-grasp</text><text class="s" x="283.0" y="434.0">constraints</text></g><g class="node"><rect x="380" y="350.0" width="146" height="104" rx="6"/><text class="t" x="453.0" y="391.0">Replay in sim</text><text class="s" x="453.0" y="410.0">LIBERO Panda</text><text class="s" x="453.0" y="426.0">20 Hz</text></g><g class="node"><rect x="550" y="350.0" width="146" height="104" rx="6"/><text class="t" x="623.0" y="391.0">Success?</text><text class="s" x="623.0" y="410.0">cup on the plate</text><text class="s" x="623.0" y="426.0">after 1 s</text></g><path class="edge" d="M186 402.0 L208 402.0" marker-end="url(#ah)"/><path class="edge" d="M356 402.0 L378 402.0" marker-end="url(#ah)"/><path class="edge" d="M526 402.0 L548 402.0" marker-end="url(#ah)"/><g class="node alt"><rect x="40" y="170" width="656" height="66" rx="6"/><text class="t" x="368.0" y="192.0">Track points</text><text class="s" x="368.0" y="211.0">CoTracker: 6 hand points · SAM 2 mask → 8 mug points</text><text class="s" x="368.0" y="227.0">+ D405 depth → 3D flow in the table frame</text></g><text class="b" x="40" y="160" style="text-anchor:start">BRANCH 1 · ACTION FLOW</text><text class="b" x="40" y="476.0" style="text-anchor:start">BRANCH 2 · REAL2SIM</text><path class="edge" d="M453.0 112 L453.0 134 L20 134 L20 203.0 L38 203.0" marker-end="url(#ah)"/><path class="edge" d="M20 134 L20 402.0 L38 402.0" marker-end="url(#ah)"/><g class="node"><rect x="720" y="248" width="146" height="104" rx="6"/><text class="t" x="793.0" y="281.0">Robot clock</text><text class="s" x="793.0" y="300.0">flow pauses</text><text class="s" x="793.0" y="316.0">where the</text><text class="s" x="793.0" y="332.0">replay pauses</text></g><path class="edge" d="M696 203.0 L706.0 203.0 L706.0 284.0 L718 284.0" marker-end="url(#ah)"/><path class="edge" d="M696 402.0 L706.0 402.0 L706.0 316.0 L718 316.0" marker-end="url(#ah)"/><g class="node"><rect x="890" y="248" width="146" height="104" rx="6"/><text class="t" x="963.0" y="273.0">Data splits</text><text class="s" x="963.0" y="292.0">successes:</text><text class="s" x="963.0" y="308.0">train 80</text><text class="s" x="963.0" y="324.0">val 10 · test 10</text><text class="s" x="963.0" y="340.0">failed 46</text></g><path class="edge" d="M866 300.0 L888 300.0" marker-end="url(#ah)"/>
+        </svg>
+      </div>
+    </figure>
+  </section>
+
+  <section id="environment-setup">
+    <h2>Environment setup</h2>
+    <figure class="photo">
+      <img src="img/table_frame.jpg" alt="Left: D405 colour image of the desk with the table marker's axes drawn on it, red x pointing away from the camera, green y to the left, blue z up. Right: the aligned depth image.">
+      <figcaption>D405 colour image with the table frame drawn on the marker (x red, y green, z up blue), and the aligned depth image.</figcaption>
+    </figure>
+  </section>
+
+  <section id="real2sim">
+    <h2>Real2sim</h2>
     <p class="todo">Content to come.</p>
   </section>
 
-  <section id="recording-episodes">
-    <h2>Recording episodes</h2>
+  <section id="action-flows">
+    <h2>Action flows</h2>
     <p class="todo">Content to come.</p>
   </section>
 
-  <section id="hand-and-mug-tracking">
-    <h2>Hand and mug tracking</h2>
+  <section id="data-splits">
+    <h2>Data splits</h2>
     <p class="todo">Content to come.</p>
   </section>
 
-  <section id="flow-format">
-    <h2>Flow format</h2>
+  <section id="third-party-dependencies">
+    <h2>Third-party dependencies</h2>
     <p class="todo">Content to come.</p>
   </section>
 
-  <section id="sim-replay-and-dataset">
-    <h2>Sim replay and dataset</h2>
+  <section id="limitations">
+    <h2>Limitations</h2>
     <p class="todo">Content to come.</p>
   </section>
 </main>
