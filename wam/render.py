@@ -45,27 +45,49 @@ def write_mp4(path, frames, fps):
     ff.wait()
 
 
-def write_panels(ep, plan, sim_frames, path):
-    """One video per end-to-end episode at the robot's 20 Hz: real video + recorded flow | generated video + planned
-    flow (wam/plan.py) | robot wrist camera | robot third-person camera. sim_frames: (third-person, wrist) per step.
-    Each video shows the 1.6 s flow chunk its frame belongs to (the real video holds its last frame at the end)."""
+FONT = "/usr/share/fonts/truetype/noto/NotoSans-{}.ttf"
+PANELS = (("My recording + recorded flow", 448), ("Cosmos WAM: generated video + planned flow", 448),
+          ("Robot wrist camera", 256), ("Robot, third person", 256))
+
+
+def title_bars(title, width):
+    """Header (title left, time drawn per frame on the right) and a caption bar over each panel, as RGB uint8."""
+    from PIL import Image, ImageDraw, ImageFont
+    bold, reg = ImageFont.truetype(FONT.format("Bold"), 17), ImageFont.truetype(FONT.format("Regular"), 14)
+    img = Image.new("RGB", (width, 66), (24, 27, 34))
+    d = ImageDraw.Draw(img)
+    d.text((12, 20), title, font=bold, fill=(240, 242, 246), anchor="lm")
+    x = 0
+    for text, w in PANELS:
+        d.rectangle([x, 40, x + w - 1, 65], fill=(38, 42, 52))
+        d.text((x + w / 2, 53), text, font=reg, fill=(200, 205, 214), anchor="mm")
+        x += w
+    return np.asarray(img).copy(), reg
+
+
+def write_panels(ep, plan, sim_frames, path, src=None, title=""):
+    """One video per end-to-end episode at the robot's 20 Hz, under a title bar: real video + recorded flow | generated
+    video + planned flow (wam/plan.py) | robot wrist camera | robot third-person camera. sim_frames: (third-person,
+    wrist) per step. Each video shows the 1.6 s flow chunk its frame belongs to (the real video holds its last frame at
+    the end). src: plan step per sim step when pauses were inserted into the plan (the generated video pauses with it)."""
+    from PIL import Image, ImageDraw
     sys.path.insert(0, str(ROOT / "wam"))
     from data import H, read_flow, read_frames
     cam = camera(ep)
     real, real_flow = read_frames(ep / "video_sim.mp4"), read_flow(ep)
     gen, gen_flow = read_frames(plan / "plans" / f"{ep.name}.mp4"), np.load(plan / "plans" / f"{ep.name}.npz")["flow"]
+    bars, font = title_bars(title, sum(w for _, w in PANELS))
     out = []
     for i, (third, wrist) in enumerate(sim_frames):
-        j = i // 2  # 10 Hz frame of the plan; chunk c covers frames 16 c + 1 ... 16 c + 16 (frame 0 = the real image)
+        j = (i if src is None else src[min(i, len(src) - 1)]) // 2  # 10 Hz frame of the plan; chunk c covers frames 16 c + 1 ... 16 c + 16 (frame 0 = the real image)
         c = min(max(j - 1, 0) // 16, len(gen_flow) // 16 - 1)
         g = overlay(gen[min(j, len(gen) - 1)], gen_flow[16 * c:16 * c + 16], cam)
         r = min(i, len(real) - 1)
         rows = np.minimum(32 * (r // 32) + np.arange(0, 32, 2), len(real_flow) - 1)
         a = overlay(real[r], real_flow[rows], cam)
-        panels = [a, g, cv2.resize(wrist, (H, H)), cv2.resize(third, (H, H))]
-        for img, text in zip(panels, ("real + recorded flow", "generated + planned flow", "robot wrist", "robot")):
-            cv2.putText(img, text, (8, 20), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 1, cv2.LINE_AA)
-        cv2.putText(panels[0], f"t = {i / 20:.1f} s", (8, H - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 1,
-                    cv2.LINE_AA)
-        out.append(np.concatenate(panels, 1))
+        head = Image.fromarray(bars)
+        ImageDraw.Draw(head).text((head.width - 12, 20), f"t = {i / 20:4.1f} s", font=font, fill=(200, 205, 214),
+                                  anchor="rm")
+        out.append(np.concatenate([np.asarray(head), np.concatenate([a, g, cv2.resize(wrist, (H, H)),
+                                                                     cv2.resize(third, (H, H))], 1)], 0))
     write_mp4(path, out, 20)

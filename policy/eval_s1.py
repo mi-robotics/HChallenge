@@ -23,6 +23,8 @@ episodes, seed 0.
 DIR/eval_<policy run>.json, and --video writes DIR/videos/<episode>.mp4 for the first --video-episodes test episodes:
 real video + recorded flow | generated video + planned flow | robot wrist camera | robot third-person camera
 (wam/render.py).
+--pauses (with --plan): insert the replay's pauses into the plan (add_pauses), DIR/eval_<policy run>_pauses.json and
+DIR/videos_pauses/.
 """
 import argparse
 import json
@@ -40,7 +42,8 @@ sys.path.insert(0, str(ROOT / "replay"))
 sys.path.insert(0, str(ROOT / "sim"))
 from s1_model import S1Config, S1Model  # noqa: E402
 from train_s1 import FLOW_POINTS, episode_dirs, flow_features  # noqa: E402
-from replay import HZ, snapshot  # noqa: E402
+from replay import ARRIVE_S, GRIP_S, HZ, LIFT_M, OPEN_HOLD_S, snapshot  # noqa: E402
+from retarget import grasp_events  # noqa: E402
 from scene import OPEN, make_env, move_to, place, reset, set_camera, set_third_person_camera  # noqa: E402
 
 EXTRA_S = 3
@@ -61,8 +64,23 @@ def pinch_sim(ep, sim):
     return hand[1:3, :, :3].mean(0) + sim["sim_minus_real"]
 
 
-def run_episode(env, ep, model, norm, ck, execute, denoise, dev, frames=None, plan=None):
-    """-> (success, trail error in mm). frames: list to append (third-person, wrist) images to."""
+def add_pauses(pts):
+    """Plan [N, 14, 4] at sim steps -> (plan with the replay's pauses, source step per row), as the robot clock puts them
+    into the recorded flow (replay.rim_grasp_constraints, flow/sim_clock.py): the flow holds still for the settle and
+    close at the grasp (ARRIVE_S + GRIP_S) and for the hold and 1 cm/step rise after the release. Grasp and release
+    from the plan's thumb / index tips with the step 1.7 rule; a plan without both gets no pauses."""
+    try:
+        g, r = grasp_events(np.linalg.norm(pts[:, 1, :3] - pts[:, 2, :3], axis=1), pts[:, 1:3, :3].mean(1))
+    except IndexError:
+        return pts, np.arange(len(pts))
+    n_g, n_r = int((ARRIVE_S + GRIP_S) * HZ), int(OPEN_HOLD_S * HZ) + int(LIFT_M / 0.01)
+    src = np.r_[np.arange(g), [g] * n_g, np.arange(g, r), [r] * n_r, np.arange(r, len(pts))]
+    return pts[src], src
+
+
+def run_episode(env, ep, model, norm, ck, execute, denoise, dev, frames=None, plan=None, pauses=False, src=None):
+    """-> (success, trail error in mm). frames: list to append (third-person, wrist) images to; src: list that gets the
+    plan step each row of a paused plan comes from."""
     sim = np.load(ep / "sim.npz")
     pinch, eef = pinch_sim(ep, sim), []
     if ck.get("flow"):
@@ -70,6 +88,10 @@ def run_episode(env, ep, model, norm, ck, execute, denoise, dev, frames=None, pl
         pts = np.concatenate([fl["hand"], fl["cup"]]).transpose(1, 0, 2)
         if plan is not None:
             pts = np.repeat(np.load(plan / "plans" / f"{ep.name}.npz")["flow"], 2, axis=0)  # 10 Hz -> sim steps
+            if pauses:
+                pts, s = add_pauses(pts)
+                if src is not None:
+                    src.extend(s)
         pts = torch.from_numpy(pts.astype(np.float32)).to(dev)
         smr = torch.from_numpy(sim["sim_minus_real"].astype(np.float32)).to(dev)[None]
     sc = json.loads((ep / "scene.json").read_text())
@@ -113,7 +135,7 @@ def run_episode(env, ep, model, norm, ck, execute, denoise, dev, frames=None, pl
     return bool(env.check_success()), float(1000 * np.median(np.linalg.norm(np.array(eef[:n]) - pinch[:n], axis=1)))
 
 
-def worker(ckpt, execute, denoise, jobs, results, video_dir, plan):
+def worker(ckpt, execute, denoise, jobs, results, video_dir, plan, pauses, label):
     dev = torch.device("cuda")
     model, norm, ck = load_policy(ckpt, dev)
     env = make_env(img_size=256)
@@ -124,11 +146,13 @@ def worker(ckpt, execute, denoise, jobs, results, video_dir, plan):
         split, seed, attempt, k, ep, keep_frames = job
         frames = [] if keep_frames else None
         torch.manual_seed(1000 * seed + k + 1_000_000 * attempt)
-        ok, trail = run_episode(env, Path(ep), model, norm, ck, execute, denoise, dev, frames, plan)
+        src = []
+        ok, trail = run_episode(env, Path(ep), model, norm, ck, execute, denoise, dev, frames, plan, pauses, src)
         if frames is not None and plan is not None:
             sys.path.insert(0, str(ROOT / "wam"))
             from render import write_panels
-            write_panels(Path(ep), plan, frames, video_dir / f"{Path(ep).name}.mp4")
+            write_panels(Path(ep), plan, frames, video_dir / f"{Path(ep).name}.mp4", src or None,
+                         f"{label}  ·  {split} episode {Path(ep).name}  ·  {'success' if ok else 'failure'}")
         elif frames is not None:
             np.save(video_dir / f"{k:02d}_{Path(ep).name}.npy", np.stack([f[0] for f in frames]))
         results.put((split, seed, attempt, Path(ep).name, ok, trail))
@@ -148,8 +172,11 @@ def main():
     ap.add_argument("--video", type=Path)
     ap.add_argument("--video-episodes", type=int, default=10)
     ap.add_argument("--plan", type=Path)
+    ap.add_argument("--pauses", action="store_true")
+    ap.add_argument("--label", default="", help="--plan: title of the videos")
     args = ap.parse_args()
-    video_dir = args.plan / "videos" if args.plan else args.ckpt.parent / "eval_video_frames"
+    tag = "_pauses" if args.pauses else ""
+    video_dir = args.plan / f"videos{tag}" if args.plan else args.ckpt.parent / "eval_video_frames"
     if args.video or args.plan:
         video_dir.mkdir(exist_ok=True)
     ctx = mp.get_context("spawn")
@@ -164,7 +191,7 @@ def main():
                     n += 1
     for _ in range(args.workers):
         jobs.put(None)
-    procs = [ctx.Process(target=worker, args=(args.ckpt, args.execute, args.denoise, jobs, results, video_dir, args.plan))
+    procs = [ctx.Process(target=worker, args=(args.ckpt, args.execute, args.denoise, jobs, results, video_dir, args.plan, args.pauses, args.label))
              for _ in range(args.workers)]
     for p in procs:
         p.start()
@@ -192,9 +219,9 @@ def main():
     ck = torch.load(args.ckpt, map_location="cpu", weights_only=False)
     out = args.ckpt.parent / f"eval_{args.ckpt.stem}{f'_x{args.attempts}' if args.attempts > 1 else ''}.json"
     if args.plan:
-        out = args.plan / f"eval_{args.ckpt.parent.name}.json"
+        out = args.plan / f"eval_{args.ckpt.parent.name}{tag}.json"
     out.write_text(json.dumps({"ckpt": str(args.ckpt), "step": ck["step"], "execute": args.execute,
-                               "denoise": args.denoise, "plan": str(args.plan), "seeds": args.seeds, "attempts": args.attempts,
+                               "denoise": args.denoise, "plan": str(args.plan), "pauses": args.pauses, "seeds": args.seeds, "attempts": args.attempts,
                                "summary": summary, "per_episode": per,
                                "trail_mm": trail},
                               indent=1))

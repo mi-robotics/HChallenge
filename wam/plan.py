@@ -5,6 +5,8 @@
 
 Per episode: <episode>.npz flow [16 chunks, 14, 4] (table frame, 10 Hz: row j is sim step 2 j) and <episode>.mp4,
 the generated frames (10 Hz, frame 0 = the real first frame). policy/eval_s1.py --plan <out> reads them.
+--given-state (layouts with a state slot): the first chunk also gets the recorded flow row at frame 0 (the hand and
+mug where they are in the first frame).
 """
 import argparse
 import json
@@ -17,7 +19,7 @@ import torch
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "policy"))
-from data import FLOW_STEPS, STRIDE, read_frames  # noqa: E402
+from data import FLOW_STEPS, STRIDE, read_flow, read_frames  # noqa: E402
 from render import write_mp4  # noqa: E402
 from sample import load_run  # noqa: E402
 from train import rollout  # noqa: E402
@@ -34,6 +36,7 @@ def main():
     ap.add_argument("--steps", type=int, default=35)
     ap.add_argument("--sigma-min", type=float, default=0.002)
     ap.add_argument("--batch", type=int, default=8)
+    ap.add_argument("--given-state", action="store_true")
     args = ap.parse_args()
     cfg = json.loads((args.ckpt.parent / "config.json").read_text())
     (args.out / "plans").mkdir(parents=True, exist_ok=True)
@@ -47,9 +50,10 @@ def main():
         batch = eps[k:k + args.batch]
         chunks = -(-max(horizon[ep] for ep in batch) // (STRIDE * FLOW_STEPS))
         frame0 = np.stack([read_frames(ep / "video_sim.mp4", first=True)[0] for ep in batch])
+        state0 = np.stack([read_flow(ep)[0] for ep in batch]) if args.given_state else None
         with torch.autocast("cuda", torch.bfloat16):
             frames, flow = rollout(model, vae, frame0, text, cfg["flow_stats"], layout, chunks,
-                                   dict(steps=args.steps, sigma_min=args.sigma_min))
+                                   dict(steps=args.steps, sigma_min=args.sigma_min), state0)
         for j, ep in enumerate(batch):
             np.savez(args.out / "plans" / f"{ep.name}.npz", flow=flow[j])
             write_mp4(args.out / "plans" / f"{ep.name}.mp4", frames[j], 10)

@@ -304,6 +304,14 @@ Dropped after step 1.9. Offline replay of a recorded video already gets the sim 
   v2 76 / 114 / 91 / 118 mm (counts timing errors too). The continuation does not help end to end. Train is far above
   val/test in plan error, so the WAM partly memorised its 80 episodes. Failures in the videos: the cup set down short of
   the plate. The sim run is cheap (146 runs in 1.9 min); sharing the GPU with Cosmos sampling starves the policy.
+  **Pauses added** (`--pauses`): the plans rarely hold still (pinch moves < 2 mm per 0.1 s in 7 % of plan steps vs 32 %
+  of recorded ones), so the replay's pauses are inserted after planning: grasp / release from the plan's thumb and
+  index tips with the step 1.7 rule (found in 141 / 146 v1, 136 / 146 v2 plans), flow held 1.0 s at the grasp and
+  0.75 s at the release. v1 58 / 20 / 20 / 4 %, v2 39 / 0 / 40 / 2 %: train up (v1 +18 / −9 episodes), val and test
+  within one episode. **v2 + recorded first flow row** (`wam/plan.py --given-state`, the hand and mug as recorded in
+  the first frame given to the first chunk): first 1.6 s chunk 36 mm from the recorded flow vs 59 mm from the image
+  alone (val + test), whole episode 73 / 105 / 93 / 111 mm; success 38 / 30 / 20 / 4 %, with pauses 52 / 40 / 20 / 4 %.
+  With 10 val / test episodes and 1 seed none of these differences is outside one or two episodes.
 
 ### Evaluation
 

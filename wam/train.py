@@ -101,11 +101,12 @@ def predict(model, vae, frames_now, text, stats, layout, state=None, sampler=Non
 
 
 @torch.no_grad()
-def rollout(model, vae, frame0, text, stats, layout, chunks, sampler=None):
+def rollout(model, vae, frame0, text, stats, layout, chunks, sampler=None, state0=None):
     """frame0 [B, H, W, 3] -> frames [B, 1 + 16 chunks, H, W, 3], flow [B, 16 chunks, 14, 4] (None if video only).
     Each chunk starts from the last frame the previous one predicted; the first from the image alone, later ones (if
-    the layout has a state slot) also from the previous chunk's last flow row (0.1 s before the chunk starts)."""
-    frames, flows, now, state = [frame0[:, None]], [], frame0, None
+    the layout has a state slot) also from the previous chunk's last flow row (0.1 s before the chunk starts).
+    state0 [B, 14, 4]: a flow row given to the first chunk too (e.g. the recorded one at frame0)."""
+    frames, flows, now, state = [frame0[:, None]], [], frame0, state0
     for _ in range(chunks):
         flow, video = predict(model, vae, torch.from_numpy(now)[:, None].cuda(), text, stats, layout, state,
                               sampler, video=True)
