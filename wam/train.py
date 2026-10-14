@@ -102,19 +102,19 @@ def predict(model, vae, frames_now, text, stats, layout, state=None, sampler=Non
 
 @torch.no_grad()
 def rollout(model, vae, frame0, text, stats, layout, chunks, sampler=None):
-    """frame0 [H, W, 3] -> frames [1 + 16 chunks, H, W, 3], flow [16 chunks, 14, 4] (None if video only). Each chunk
-    starts from the last frame the previous one predicted; the first from the image alone, later ones (if the layout
-    has a state slot) also from the previous chunk's last flow row (0.1 s before the chunk starts)."""
-    frames, flows, now, state = [frame0], [], frame0, None
+    """frame0 [B, H, W, 3] -> frames [B, 1 + 16 chunks, H, W, 3], flow [B, 16 chunks, 14, 4] (None if video only).
+    Each chunk starts from the last frame the previous one predicted; the first from the image alone, later ones (if
+    the layout has a state slot) also from the previous chunk's last flow row (0.1 s before the chunk starts)."""
+    frames, flows, now, state = [frame0[:, None]], [], frame0, None
     for _ in range(chunks):
-        flow, video = predict(model, vae, torch.from_numpy(now)[None, None].cuda(), text, stats, layout, state,
+        flow, video = predict(model, vae, torch.from_numpy(now)[:, None].cuda(), text, stats, layout, state,
                               sampler, video=True)
-        frames += list(video[0, 1:])
-        now = video[0, -1]
+        frames.append(video[:, 1:])
+        now = video[:, -1]
         if flow is not None:
-            flows.append(flow[0])
+            flows.append(flow)
             state = flow[:, -1]
-    return np.stack(frames), (np.concatenate(flows) if flows else None)
+    return np.concatenate(frames, 1), (np.concatenate(flows, 1) if flows else None)
 
 
 def flow_error_mm(pred, true):
@@ -185,7 +185,8 @@ def evaluate(model, vae, text, stats, vs, out, step, chunks, layout, sampler=Non
     res["rollout_flow_mm"] = {}
     val = vs.val
     for e in vs.rollouts:
-        frames, flow = rollout(model, vae, val.frames[e][0], text, stats, layout, chunks, sampler)
+        frames, flow = rollout(model, vae, val.frames[e][:1], text, stats, layout, chunks, sampler)
+        frames, flow = frames[0], None if flow is None else flow[0]
         rows = np.minimum(np.arange(0, STRIDE * FLOW_STEPS * chunks + 1, STRIDE), len(val.flow[e]) - 1)
         real_frames, real_flow = val.frames[e][rows], val.flow[e][rows[:-1]]
         if flow is not None:

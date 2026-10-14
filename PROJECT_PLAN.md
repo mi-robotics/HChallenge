@@ -287,6 +287,23 @@ Dropped after step 1.9. Offline replay of a recorded video already gets the sim 
   21.4 GB; without checkpointing batch 8 runs out of memory. Sampling one 1.6 s chunk: 2.2 s (20 steps), 1.1 s
   (10 steps). 20k steps at batch 8 ≈ 23 h (≈ 18 h with the latents cached). Not run yet: real Cosmos weights (gated)
   and the T5 prompt embedding (from the same repo).
+- **6.2** Three LoRA runs, same config (20k steps, batch 8, LR 1e-4; 3.2 / 4.3 / 2.7 s per step = 18 / 24 / 15 h on the 5090). A first run drew independent
+  noise for each of the 32 flow copies and learned the mean flow (205 mm vs the mean-flow predictor's 200 mm);
+  one noise draw tiled like the flow fixed it. **v1** video + flow: 1.6 s val flow error 60 mm from the image alone
+  (mean over steps 10k–20k; hold still 70 mm), 9.6 s chained rollouts 102 mm (4 val episodes, one sample each).
+  **v2** + the flow's current row as a condition (given clean half the time): 61 mm from the image alone, 41 mm with
+  the recorded current row given, rollouts 110 mm when chained on its own last row. **v3** video only: video loss
+  0.018 vs 0.025 (v1) at 18k–20k. Sampler: Cosmos Policy's 5 steps / σ_min 4 gives the same flow error as 35 steps /
+  σ_min 0.002, but the moving hand is visibly cleaner at 15–35 steps.
+- **6.3** `wam/plan.py`: from each episode's first real frame, chained 1.6 s chunks (35 steps, σ_min 0.002, v2 hands each
+  chunk's last flow row to the next) until the policy's horizon (recorded length + 3 s) is covered; 146 episodes in
+  86 min. `policy/eval_s1.py --plan` feeds that flow to `full_wrist_state_no_img_pos` (wrist camera + state + hand and
+  mug flow) instead of the recorded flow; the real→sim offset (sim_minus_real) is still the episode's recorded one.
+  Success, 1 seed, 1 attempt (train / val / test / failed): recorded flow (seed 0 of the step 5 eval) 98 / 60 / 80 / 7 %;
+  **v1 46 / 20 / 30 / 4 %; v2 34 / 10 / 30 / 4 %.** Plan vs recorded flow at the same step: v1 77 / 119 / 114 / 120 mm,
+  v2 76 / 114 / 91 / 118 mm (counts timing errors too). The continuation does not help end to end. Train is far above
+  val/test in plan error, so the WAM partly memorised its 80 episodes. Failures in the videos: the cup set down short of
+  the plate. The sim run is cheap (146 runs in 1.9 min); sharing the GPU with Cosmos sampling starves the policy.
 
 ### Evaluation
 
@@ -299,7 +316,7 @@ Dropped after step 1.9. Offline replay of a recorded video already gets the sim 
 ### Done when
 
 - [ ] Predicted trails drawn on real test photos look sensible
-- [ ] End-to-end success rate reported
+- [x] End-to-end success rate reported
 - [ ] Hero demo video: real photo with predicted trail | sim robot executing it
 
 ---

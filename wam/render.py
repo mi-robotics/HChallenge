@@ -1,4 +1,5 @@
-"""Draw a flow sample [16, 14, 4] (table frame) on 256 x 448 frames with the episode's marker pose."""
+"""Draw a flow sample [16, 14, 4] (table frame) on 256 x 448 frames with the episode's marker pose; the end-to-end
+videos (step 6.3)."""
 import json
 import sys
 import subprocess
@@ -42,3 +43,29 @@ def write_mp4(path, frames, fps):
         ff.stdin.write(np.ascontiguousarray(f).tobytes())
     ff.stdin.close()
     ff.wait()
+
+
+def write_panels(ep, plan, sim_frames, path):
+    """One video per end-to-end episode at the robot's 20 Hz: real video + recorded flow | generated video + planned
+    flow (wam/plan.py) | robot wrist camera | robot third-person camera. sim_frames: (third-person, wrist) per step.
+    Each video shows the 1.6 s flow chunk its frame belongs to (the real video holds its last frame at the end)."""
+    sys.path.insert(0, str(ROOT / "wam"))
+    from data import H, read_flow, read_frames
+    cam = camera(ep)
+    real, real_flow = read_frames(ep / "video_sim.mp4"), read_flow(ep)
+    gen, gen_flow = read_frames(plan / "plans" / f"{ep.name}.mp4"), np.load(plan / "plans" / f"{ep.name}.npz")["flow"]
+    out = []
+    for i, (third, wrist) in enumerate(sim_frames):
+        j = i // 2  # 10 Hz frame of the plan; chunk c covers frames 16 c + 1 ... 16 c + 16 (frame 0 = the real image)
+        c = min(max(j - 1, 0) // 16, len(gen_flow) // 16 - 1)
+        g = overlay(gen[min(j, len(gen) - 1)], gen_flow[16 * c:16 * c + 16], cam)
+        r = min(i, len(real) - 1)
+        rows = np.minimum(32 * (r // 32) + np.arange(0, 32, 2), len(real_flow) - 1)
+        a = overlay(real[r], real_flow[rows], cam)
+        panels = [a, g, cv2.resize(wrist, (H, H)), cv2.resize(third, (H, H))]
+        for img, text in zip(panels, ("real + recorded flow", "generated + planned flow", "robot wrist", "robot")):
+            cv2.putText(img, text, (8, 20), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 1, cv2.LINE_AA)
+        cv2.putText(panels[0], f"t = {i / 20:.1f} s", (8, H - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 1,
+                    cv2.LINE_AA)
+        out.append(np.concatenate(panels, 1))
+    write_mp4(path, out, 20)

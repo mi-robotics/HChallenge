@@ -27,11 +27,11 @@ def episode_dirs(split):
     return [ROOT / "data" / "mug_pnp_dataset" / n for n in names]
 
 
-def read_frames(path, size=(W, H)):
+def read_frames(path, size=(W, H), first=False):
     cap, out = cv2.VideoCapture(str(path)), []
     while True:
         ok, img = cap.read()
-        if not ok:
+        if not ok or (first and out):
             return np.stack(out)
         out.append(cv2.resize(img, size, interpolation=cv2.INTER_AREA)[..., ::-1])  # RGB
 
