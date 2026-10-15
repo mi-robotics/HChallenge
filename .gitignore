@@ -21,3 +21,6 @@ third_party/
 
 # Training runs (checkpoints, logs)
 outputs/
+
+# Step reports and tracker: kept locally, not in the repo
+docs/
