@@ -1,14 +1,14 @@
 /* Shared style for the project site. Same tokens and fonts as the step reports (docs/steps). */
 :root {
-  --node: #ffffff; --node-alt: #eef1fb;
+  --node: #ffffff; --node-alt: #eef1fb; --train: #2d4fd0; --test: #d98a00; --failed: #8a919d; --notusable: #c3c8d0;
   --bg: #f5f6f8; --surface: #ffffff; --fg: #1a1e26; --muted: #5d6573; --line: #dde1e8; --accent: #2d4fd0;
   --display: "Archivo", "Helvetica Neue", Arial, sans-serif;
   --mono: "JetBrains Mono", ui-monospace, Menlo, monospace;
 }
 @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
-  --bg: #12151b; --surface: #1a1e26; --fg: #e6e9ef; --muted: #98a0ae; --line: #2c323d; --accent: #8aa2ff; --node: #1a1e26; --node-alt: #1e2540; color-scheme: dark } }
+  --bg: #12151b; --surface: #1a1e26; --fg: #e6e9ef; --muted: #98a0ae; --line: #2c323d; --accent: #8aa2ff; --node: #1a1e26; --node-alt: #1e2540; --train: #8aa2ff; --test: #f2b33d; --failed: #8a919d; --notusable: #4a515d; color-scheme: dark } }
 :root[data-theme="dark"] {
-  --bg: #12151b; --surface: #1a1e26; --fg: #e6e9ef; --muted: #98a0ae; --line: #2c323d; --accent: #8aa2ff; --node: #1a1e26; --node-alt: #1e2540; color-scheme: dark }
+  --bg: #12151b; --surface: #1a1e26; --fg: #e6e9ef; --muted: #98a0ae; --line: #2c323d; --accent: #8aa2ff; --node: #1a1e26; --node-alt: #1e2540; --train: #8aa2ff; --test: #f2b33d; --failed: #8a919d; --notusable: #4a515d; color-scheme: dark }
 
 * { box-sizing: border-box; }
 body { margin: 0; background: var(--bg); color: var(--fg); font: 16px/1.6 var(--display); }
@@ -57,4 +57,35 @@ section { scroll-margin-top: 16px; }
 
 .photo { margin: 0; display: grid; gap: 8px; max-width: 36rem; }
 .photo img { display: block; width: 100%; max-width: 36rem; border-radius: 6px; border: 1px solid var(--line); background: var(--surface); }
+.sub { margin: 4px 0 0; font: 700 17px/1.3 var(--display); }
+.points { margin: 0; padding-left: 1.2em; display: grid; gap: 6px; max-width: 70ch; }
+.points ul { margin: 6px 0 0; padding-left: 1.2em; display: grid; gap: 4px; }
+.stats { border-collapse: collapse; font: 13px/1.4 var(--mono); font-variant-numeric: tabular-nums; }
+.stats th, .stats td { text-align: left; padding: 8px 20px 8px 0; border-bottom: 1px solid var(--line); white-space: nowrap; }
+.stats thead th { font-weight: 500; color: var(--muted); }
+.stats tbody th { font-weight: 400; }
+.note { margin: 0; font-size: 14px; color: var(--muted); max-width: 70ch; }
+.format { margin: 0; padding: 14px 16px; background: var(--surface); border: 1px solid var(--line); border-radius: 6px; font: 13px/1.6 var(--mono); overflow-x: auto; }
+.chart { margin: 0; display: grid; gap: 8px; min-width: 0; max-width: 40rem; }
+.chart svg { display: block; width: 100%; min-width: 420px; height: auto; }
+.chart .grid { stroke: var(--line); stroke-width: 1; }
+.chart .tick { font: 11px var(--mono); fill: var(--muted); }
+.chart .axis { font: 12px var(--mono); fill: var(--muted); }
+.chart .pt { stroke-width: 1.4; }
+.chart .train { fill: var(--train); stroke: var(--bg); }
+.chart .test { fill: var(--test); stroke: var(--bg); }
+.chart .failed { fill: none; stroke: var(--failed); }
+.chart .notusable { fill: none; stroke: var(--notusable); }
+.chart .marker { fill: var(--fg); }
+.key { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin: 0 4px 0 10px; vertical-align: -1px; }
+.key:first-child { margin-left: 0; }
+.key.train { background: var(--train); } .key.test { background: var(--test); }
+.key.failed { border: 1.5px solid var(--failed); } .key.notusable { border: 1.5px solid var(--notusable); }
+.key.marker { background: var(--fg); border-radius: 0; }
+.deps a { color: var(--accent); text-decoration: none; }
+.deps a:hover { text-decoration: underline; }
+.deps a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.episode { margin: 0; display: grid; gap: 8px; min-width: 0; }
+.episode h3 { margin: 8px 0 0; font: 500 13px/1.3 var(--mono); letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+.episode video { display: block; width: 100%; height: auto; aspect-ratio: 1920 / 304; border-radius: 6px; border: 1px solid var(--line); background: var(--surface); }
 figcaption { font: 13px/1.5 var(--mono); color: var(--muted); }

@@ -23,10 +23,6 @@
 </header>
 
 <main>
-  <header>
-    <h1>Recording my hand and turning it into action flow</h1>
-  </header>
-
   <nav class="toc" aria-label="On this page">
     <h2>Contents</h2>
     <ol>
@@ -53,6 +49,11 @@
         </svg>
       </div>
     </figure>
+    <figure class="episode">
+      <video src="vid/episode.mp4" autoplay muted loop playsinline controls style="aspect-ratio:1888 / 356"></video>
+      <figcaption>One episode (20261009_112208) on the robot's clock, 20 Hz: the paired real video, its action
+      flow, and the sim robot's replay with its gripper and third-person cameras.</figcaption>
+    </figure>
   </section>
 
   <section id="environment-setup">
@@ -65,27 +66,156 @@
 
   <section id="real2sim">
     <h2>Real2sim</h2>
-    <p class="todo">Content to come.</p>
+    <ul class="points">
+      <li><strong>Tools.</strong> Intel RealSense D405 camera (colour + depth, 30 fps), MediaPipe hand landmarker
+      (21 points per hand per frame), LIBERO / robosuite sim with a Panda arm, controlled at 20 Hz.</li>
+      <li><strong>Hand in 3D.</strong> Each hand point's pixel + its D405 depth gives a 3D point, which the ArUco
+      marker's pose moves into the table frame.</li>
+      <li><strong>Mug and plate.</strong> The D405 returns almost no depth on the white mug and saucer, so both are
+      found from the hand: where I pinch is the mug rim, where I let go is over the plate. In sim the cup goes at a
+      fixed spot and the plate at cup + (let-go point − pinch point).</li>
+      <li><strong>Retargeting.</strong>
+        <ul>
+          <li>The gripper follows the pinch point (between thumb and index tips), not the wrist.</li>
+          <li>The path is shifted so my pinch lands on the sim grasp point: the rim, one finger inside the mug,
+          since the mug is wider than the gripper. No rotation or scaling.</li>
+          <li>Gripper closes when thumb and index are under 2.5 cm apart, opens when over 3 cm after a 3 cm lift.</li>
+          <li>Three rim-grasp rules: stay 8 cm above the rim until the gripper is within 1 cm of it sideways, then
+          come down; pause 0.5 s to arrive and 0.5 s to close; after letting go, hold 0.25 s and rise 10 cm.</li>
+        </ul>
+      </li>
+      <li><strong>Robot clock.</strong> While the robot pauses, the real video is held on the same frame (amber
+      border below), so every robot step has a real frame to pair with.</li>
+      <li><strong>Success</strong> = the cup is on the plate 1 s after the replay. Only successful episodes are
+      kept for training.</li>
+    </ul>
+    <figure class="episode">
+      <h3>Demo 1</h3>
+      <video src="vid/demo1.mp4" autoplay muted loop playsinline controls></video>
+    </figure>
+    <figure class="episode">
+      <h3>Demo 2</h3>
+      <video src="vid/demo2.mp4" autoplay muted loop playsinline controls></video>
+    </figure>
+
+    <h3 class="sub">Raw hand path vs final process</h3>
+    <div class="scroll">
+      <table class="stats">
+        <thead><tr><th>165 recorded episodes</th><th>raw hand path</th><th>final process</th></tr></thead>
+        <tbody>
+          <tr><th scope="row">no usable hand path (hand lost, no grasp found)</th><td>14</td><td>14</td></tr>
+          <tr><th scope="row">replayed in sim</th><td>151</td><td>151</td></tr>
+          <tr><th scope="row">cup on plate</th><td>31 (19 %)</td><td>100 (61 %)</td></tr>
+          <tr><th scope="row">failed</th><td>134</td><td>65</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="note">Raw hand path: the gripper follows the pinch point with none of the three rules.</p>
+    <figure class="episode">
+      <h3>Episode 111418: raw fails, final succeeds</h3>
+      <video src="vid/raw_vs_final.mp4" autoplay muted loop playsinline controls style="aspect-ratio:1920 / 304"></video>
+      <figcaption>Raw: the gripper comes down on the rim and the cup is never lifted. Final: it stays above until it
+      is over the rim, then pauses to close.</figcaption>
+    </figure>
   </section>
 
   <section id="action-flows">
     <h2>Action flows</h2>
-    <p class="todo">Content to come.</p>
+    <ul class="points">
+      <li><strong>Tools.</strong> CoTracker3 (tracks points through the whole video), SAM 2 (finds the mug),
+      MediaPipe (starts the hand points), D405 depth.</li>
+      <li><strong>Hand.</strong> 6 points: wrist, thumb tip, index tip and 3 knuckles. MediaPipe places them,
+      CoTracker tracks them (restarted from MediaPipe every 0.5 s).</li>
+      <li><strong>Mug.</strong> SAM 2 finds the mug in the first frame; 8 points spread over its mask are tracked by
+      CoTracker.</li>
+      <li><strong>3D.</strong> Hand points use the D405 depth. The white mug has almost no depth, so its distance
+      comes from a 4 cm-radius cylinder that moves with my pinch while I carry it.</li>
+      <li><strong>Hidden points</strong> (behind the hand or out of view) are filled in and flagged visible = 0.</li>
+      <li><strong>Samples.</strong> 10 Hz; each sample is the next 16 steps (1.5 s) of all 14 points. For training
+      the flow is moved onto the robot's clock: it holds still while the robot pauses.</li>
+    </ul>
+    <pre class="format">hand  float32 [6, 16, 4]   wrist, thumb tip, index tip, index / middle / pinky knuckle
+cup   float32 [8, 16, 4]   8 points on the mug
+      points × 16 steps at 10 Hz (now … +1.5 s) × (x, y, z, visible)
+      x, y, z in metres, table frame · visible = 0 → hidden, mask it</pre>
+    <figure class="episode">
+      <video src="vid/flow.mp4" autoplay muted loop playsinline controls style="aspect-ratio:1920 / 608"></video>
+      <figcaption>At every frame, the flow sample that starts there: the next 16 steps (1.5 s) of the 6 hand and
+      8 mug points.</figcaption>
+    </figure>
+    <h3 class="sub">Flow on the robot's clock (what the dataset uses)</h3>
+    <ul class="points">
+      <li>The robot pauses where my hand does not (arriving and closing at the grasp, holding and rising after the
+      release, the final 1 s). The real video is held on the same frame for those steps.</li>
+      <li>The tracked flow is then read at the held video's times, so the points stand still while the video is held.
+      Video, flow and robot data all have one row per robot step (20 Hz).</li>
+    </ul>
+    <figure class="episode">
+      <video src="vid/flow_sim.mp4" autoplay muted loop playsinline controls style="aspect-ratio:1920 / 608"></video>
+      <figcaption>The same two demos on the robot's clock. Amber border: the real video is held while the robot
+      pauses.</figcaption>
+    </figure>
   </section>
 
   <section id="data-splits">
     <h2>Data splits</h2>
-    <p class="todo">Content to come.</p>
+    <div class="scroll">
+      <table class="stats">
+        <thead><tr><th>split</th><th>episodes</th><th>what it is</th><th>has</th></tr></thead>
+        <tbody>
+          <tr><th scope="row">train</th><td>80</td><td>sim replay succeeded</td><td>video, flow, robot data</td></tr>
+          <tr><th scope="row">test</th><td>20</td><td>sim replay succeeded, held out</td><td>video, flow, robot data</td></tr>
+          <tr><th scope="row">failed</th><td>46</td><td>replayed, cup not on the plate</td><td>video, flow, robot data</td></tr>
+          <tr><th scope="row">not usable</th><td>19</td><td>hand lost or no grasp found: no replay</td><td>video (17 also flow)</td></tr>
+          <tr><th scope="row">total</th><td>165</td><td></td><td></td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="note">Train and test are the 100 successful episodes shuffled with seed 0. Robot steps at 20 Hz: 18,622
+    in train + test, 7,876 in failed.</p>
+    <figure class="chart">
+      <div class="scroll"><svg viewBox="0 0 600 352" role="img" aria-labelledby="splits-title"><title id="splits-title">Top view of the table: cup start position of every episode, coloured by split; the marker is at the origin</title><line class="grid" x1="48.0" y1="12" x2="48.0" y2="312.0"/><text class="tick" x="48.0" y="328.0" text-anchor="middle">0</text><line class="grid" x1="108.0" y1="12" x2="108.0" y2="312.0"/><text class="tick" x="108.0" y="328.0" text-anchor="middle">-10</text><line class="grid" x1="168.0" y1="12" x2="168.0" y2="312.0"/><text class="tick" x="168.0" y="328.0" text-anchor="middle">-20</text><line class="grid" x1="228.0" y1="12" x2="228.0" y2="312.0"/><text class="tick" x="228.0" y="328.0" text-anchor="middle">-30</text><line class="grid" x1="288.0" y1="12" x2="288.0" y2="312.0"/><text class="tick" x="288.0" y="328.0" text-anchor="middle">-40</text><line class="grid" x1="348.0" y1="12" x2="348.0" y2="312.0"/><text class="tick" x="348.0" y="328.0" text-anchor="middle">-50</text><line class="grid" x1="408.0" y1="12" x2="408.0" y2="312.0"/><text class="tick" x="408.0" y="328.0" text-anchor="middle">-60</text><line class="grid" x1="468.0" y1="12" x2="468.0" y2="312.0"/><text class="tick" x="468.0" y="328.0" text-anchor="middle">-70</text><line class="grid" x1="528.0" y1="12" x2="528.0" y2="312.0"/><text class="tick" x="528.0" y="328.0" text-anchor="middle">-80</text><line class="grid" x1="588.0" y1="12" x2="588.0" y2="312.0"/><text class="tick" x="588.0" y="328.0" text-anchor="middle">-90</text><line class="grid" x1="48" y1="312.0" x2="588.0" y2="312.0"/><text class="tick" x="40" y="316.0" text-anchor="end">-40</text><line class="grid" x1="48" y1="252.0" x2="588.0" y2="252.0"/><text class="tick" x="40" y="256.0" text-anchor="end">-30</text><line class="grid" x1="48" y1="192.0" x2="588.0" y2="192.0"/><text class="tick" x="40" y="196.0" text-anchor="end">-20</text><line class="grid" x1="48" y1="132.0" x2="588.0" y2="132.0"/><text class="tick" x="40" y="136.0" text-anchor="end">-10</text><line class="grid" x1="48" y1="72.0" x2="588.0" y2="72.0"/><text class="tick" x="40" y="76.0" text-anchor="end">0</text><line class="grid" x1="48" y1="12.0" x2="588.0" y2="12.0"/><text class="tick" x="40" y="16.0" text-anchor="end">10</text><text class="axis" x="318.0" y="348.0" text-anchor="middle">y, cm (left +)</text><text class="axis" transform="translate(12 162.0) rotate(-90)" text-anchor="middle">x, cm (away from camera +)</text><circle class="pt notusable" cx="385.6" cy="249.7" r="4.5"/><circle class="pt notusable" cx="351.1" cy="78.8" r="4.5"/><circle class="pt notusable" cx="185.8" cy="53.1" r="4.5"/><circle class="pt notusable" cx="333.1" cy="207.4" r="4.5"/><circle class="pt notusable" cx="283.9" cy="224.9" r="4.5"/><circle class="pt notusable" cx="354.9" cy="261.2" r="4.5"/><circle class="pt notusable" cx="172.0" cy="203.9" r="4.5"/><circle class="pt notusable" cx="174.4" cy="63.2" r="4.5"/><circle class="pt notusable" cx="319.0" cy="186.3" r="4.5"/><circle class="pt notusable" cx="443.6" cy="142.6" r="4.5"/><circle class="pt notusable" cx="243.3" cy="147.9" r="4.5"/><circle class="pt notusable" cx="565.0" cy="221.9" r="4.5"/><circle class="pt notusable" cx="484.6" cy="164.9" r="4.5"/><circle class="pt notusable" cx="356.4" cy="125.4" r="4.5"/><circle class="pt notusable" cx="436.5" cy="130.1" r="4.5"/><circle class="pt notusable" cx="350.1" cy="103.5" r="4.5"/><circle class="pt notusable" cx="565.6" cy="290.0" r="4.5"/><circle class="pt failed" cx="442.9" cy="212.0" r="4.5"/><circle class="pt failed" cx="303.0" cy="78.9" r="4.5"/><circle class="pt failed" cx="578.3" cy="150.9" r="4.5"/><circle class="pt failed" cx="548.3" cy="262.6" r="4.5"/><circle class="pt failed" cx="562.6" cy="174.2" r="4.5"/><circle class="pt failed" cx="272.3" cy="104.1" r="4.5"/><circle class="pt failed" cx="506.9" cy="130.6" r="4.5"/><circle class="pt failed" cx="502.9" cy="248.4" r="4.5"/><circle class="pt failed" cx="196.9" cy="243.8" r="4.5"/><circle class="pt failed" cx="563.7" cy="88.2" r="4.5"/><circle class="pt failed" cx="306.8" cy="80.8" r="4.5"/><circle class="pt failed" cx="434.1" cy="95.8" r="4.5"/><circle class="pt failed" cx="205.9" cy="66.9" r="4.5"/><circle class="pt failed" cx="353.9" cy="94.3" r="4.5"/><circle class="pt failed" cx="293.4" cy="219.3" r="4.5"/><circle class="pt failed" cx="303.3" cy="207.6" r="4.5"/><circle class="pt failed" cx="521.7" cy="177.4" r="4.5"/><circle class="pt failed" cx="231.3" cy="84.7" r="4.5"/><circle class="pt failed" cx="206.4" cy="78.9" r="4.5"/><circle class="pt failed" cx="191.3" cy="48.7" r="4.5"/><circle class="pt failed" cx="184.6" cy="44.0" r="4.5"/><circle class="pt failed" cx="195.8" cy="236.7" r="4.5"/><circle class="pt failed" cx="210.8" cy="215.9" r="4.5"/><circle class="pt failed" cx="432.0" cy="84.5" r="4.5"/><circle class="pt failed" cx="453.5" cy="101.9" r="4.5"/><circle class="pt failed" cx="188.2" cy="222.0" r="4.5"/><circle class="pt failed" cx="177.4" cy="221.0" r="4.5"/><circle class="pt failed" cx="199.5" cy="227.4" r="4.5"/><circle class="pt failed" cx="124.6" cy="183.5" r="4.5"/><circle class="pt failed" cx="540.5" cy="232.4" r="4.5"/><circle class="pt failed" cx="204.0" cy="225.6" r="4.5"/><circle class="pt failed" cx="197.8" cy="47.9" r="4.5"/><circle class="pt failed" cx="197.3" cy="188.4" r="4.5"/><circle class="pt failed" cx="375.7" cy="93.3" r="4.5"/><circle class="pt failed" cx="205.3" cy="183.5" r="4.5"/><circle class="pt failed" cx="316.8" cy="79.1" r="4.5"/><circle class="pt failed" cx="203.4" cy="249.1" r="4.5"/><circle class="pt failed" cx="322.5" cy="91.3" r="4.5"/><circle class="pt failed" cx="130.7" cy="158.1" r="4.5"/><circle class="pt failed" cx="313.2" cy="158.7" r="4.5"/><circle class="pt failed" cx="173.4" cy="68.7" r="4.5"/><circle class="pt failed" cx="441.6" cy="127.2" r="4.5"/><circle class="pt failed" cx="306.9" cy="80.1" r="4.5"/><circle class="pt failed" cx="146.3" cy="128.3" r="4.5"/><circle class="pt failed" cx="279.0" cy="236.5" r="4.5"/><circle class="pt failed" cx="220.8" cy="142.4" r="4.5"/><circle class="pt train" cx="412.5" cy="135.3" r="4.5"/><circle class="pt train" cx="220.4" cy="201.5" r="4.5"/><circle class="pt train" cx="311.5" cy="80.5" r="4.5"/><circle class="pt train" cx="261.0" cy="244.6" r="4.5"/><circle class="pt train" cx="217.8" cy="191.9" r="4.5"/><circle class="pt train" cx="264.3" cy="265.7" r="4.5"/><circle class="pt train" cx="184.1" cy="226.3" r="4.5"/><circle class="pt train" cx="403.1" cy="161.0" r="4.5"/><circle class="pt train" cx="240.2" cy="267.2" r="4.5"/><circle class="pt train" cx="358.0" cy="241.7" r="4.5"/><circle class="pt train" cx="362.0" cy="236.3" r="4.5"/><circle class="pt train" cx="172.9" cy="74.2" r="4.5"/><circle class="pt train" cx="332.1" cy="79.7" r="4.5"/><circle class="pt train" cx="168.9" cy="212.3" r="4.5"/><circle class="pt train" cx="338.6" cy="65.1" r="4.5"/><circle class="pt train" cx="283.0" cy="136.7" r="4.5"/><circle class="pt train" cx="343.3" cy="194.5" r="4.5"/><circle class="pt train" cx="204.4" cy="180.4" r="4.5"/><circle class="pt train" cx="301.2" cy="240.6" r="4.5"/><circle class="pt train" cx="189.0" cy="40.2" r="4.5"/><circle class="pt train" cx="171.5" cy="220.7" r="4.5"/><circle class="pt train" cx="389.5" cy="234.3" r="4.5"/><circle class="pt train" cx="223.0" cy="224.5" r="4.5"/><circle class="pt train" cx="300.6" cy="102.5" r="4.5"/><circle class="pt train" cx="174.7" cy="82.5" r="4.5"/><circle class="pt train" cx="170.3" cy="205.1" r="4.5"/><circle class="pt train" cx="351.4" cy="174.2" r="4.5"/><circle class="pt train" cx="287.1" cy="123.4" r="4.5"/><circle class="pt train" cx="197.9" cy="226.2" r="4.5"/><circle class="pt train" cx="351.7" cy="95.0" r="4.5"/><circle class="pt train" cx="364.7" cy="67.0" r="4.5"/><circle class="pt train" cx="236.7" cy="192.2" r="4.5"/><circle class="pt train" cx="212.6" cy="253.5" r="4.5"/><circle class="pt train" cx="328.3" cy="186.4" r="4.5"/><circle class="pt train" cx="253.9" cy="282.5" r="4.5"/><circle class="pt train" cx="216.9" cy="227.2" r="4.5"/><circle class="pt train" cx="346.9" cy="269.6" r="4.5"/><circle class="pt train" cx="239.1" cy="228.6" r="4.5"/><circle class="pt train" cx="218.1" cy="233.5" r="4.5"/><circle class="pt train" cx="256.6" cy="141.6" r="4.5"/><circle class="pt train" cx="209.1" cy="194.1" r="4.5"/><circle class="pt train" cx="196.7" cy="93.5" r="4.5"/><circle class="pt train" cx="267.9" cy="248.3" r="4.5"/><circle class="pt train" cx="235.9" cy="211.3" r="4.5"/><circle class="pt train" cx="258.1" cy="134.8" r="4.5"/><circle class="pt train" cx="225.3" cy="206.7" r="4.5"/><circle class="pt train" cx="470.2" cy="196.4" r="4.5"/><circle class="pt train" cx="284.4" cy="224.7" r="4.5"/><circle class="pt train" cx="194.7" cy="194.0" r="4.5"/><circle class="pt train" cx="196.9" cy="49.0" r="4.5"/><circle class="pt train" cx="190.3" cy="218.1" r="4.5"/><circle class="pt train" cx="412.3" cy="180.5" r="4.5"/><circle class="pt train" cx="173.1" cy="225.3" r="4.5"/><circle class="pt train" cx="179.6" cy="226.2" r="4.5"/><circle class="pt train" cx="188.6" cy="198.2" r="4.5"/><circle class="pt train" cx="374.5" cy="127.1" r="4.5"/><circle class="pt train" cx="421.1" cy="89.3" r="4.5"/><circle class="pt train" cx="204.4" cy="173.2" r="4.5"/><circle class="pt train" cx="195.7" cy="189.9" r="4.5"/><circle class="pt train" cx="170.9" cy="197.5" r="4.5"/><circle class="pt train" cx="274.1" cy="136.3" r="4.5"/><circle class="pt train" cx="413.7" cy="152.6" r="4.5"/><circle class="pt train" cx="207.7" cy="194.1" r="4.5"/><circle class="pt train" cx="288.9" cy="87.2" r="4.5"/><circle class="pt train" cx="392.8" cy="231.9" r="4.5"/><circle class="pt train" cx="347.0" cy="101.7" r="4.5"/><circle class="pt train" cx="250.9" cy="135.1" r="4.5"/><circle class="pt train" cx="419.9" cy="175.6" r="4.5"/><circle class="pt train" cx="488.8" cy="159.9" r="4.5"/><circle class="pt train" cx="415.3" cy="140.3" r="4.5"/><circle class="pt train" cx="172.3" cy="98.2" r="4.5"/><circle class="pt train" cx="226.3" cy="167.0" r="4.5"/><circle class="pt train" cx="197.7" cy="214.2" r="4.5"/><circle class="pt train" cx="291.5" cy="90.3" r="4.5"/><circle class="pt train" cx="387.7" cy="152.5" r="4.5"/><circle class="pt train" cx="190.7" cy="201.7" r="4.5"/><circle class="pt train" cx="253.0" cy="206.3" r="4.5"/><circle class="pt train" cx="173.9" cy="105.7" r="4.5"/><circle class="pt train" cx="204.2" cy="235.4" r="4.5"/><circle class="pt train" cx="254.4" cy="133.9" r="4.5"/><circle class="pt test" cx="459.6" cy="77.9" r="4.5"/><circle class="pt test" cx="335.0" cy="133.1" r="4.5"/><circle class="pt test" cx="294.8" cy="207.8" r="4.5"/><circle class="pt test" cx="422.6" cy="107.0" r="4.5"/><circle class="pt test" cx="252.8" cy="151.2" r="4.5"/><circle class="pt test" cx="223.8" cy="265.5" r="4.5"/><circle class="pt test" cx="168.5" cy="83.7" r="4.5"/><circle class="pt test" cx="554.0" cy="173.4" r="4.5"/><circle class="pt test" cx="421.4" cy="248.6" r="4.5"/><circle class="pt test" cx="229.8" cy="188.0" r="4.5"/><circle class="pt test" cx="164.6" cy="214.6" r="4.5"/><circle class="pt test" cx="499.9" cy="258.2" r="4.5"/><circle class="pt test" cx="341.8" cy="76.6" r="4.5"/><circle class="pt test" cx="323.5" cy="104.4" r="4.5"/><circle class="pt test" cx="244.8" cy="275.3" r="4.5"/><circle class="pt test" cx="416.7" cy="152.1" r="4.5"/><circle class="pt test" cx="313.2" cy="94.1" r="4.5"/><circle class="pt test" cx="374.1" cy="210.4" r="4.5"/><circle class="pt test" cx="202.5" cy="219.4" r="4.5"/><circle class="pt test" cx="179.5" cy="226.7" r="4.5"/><rect class="marker" x="43.0" y="67.0" width="10" height="10"/></svg></div>
+      <figcaption><span class="key train"></span>train 80 <span class="key test"></span>test 20
+      <span class="key failed"></span>failed 46 <span class="key notusable"></span>not usable 17 of 19 (2 have no
+      flow) <span class="key marker"></span>marker. Cup start position per episode, table frame, top view.</figcaption>
+    </figure>
   </section>
 
   <section id="third-party-dependencies">
     <h2>Third-party dependencies</h2>
-    <p class="todo">Content to come.</p>
+    <div class="scroll">
+      <table class="stats deps">
+        <thead><tr><th>tool</th><th>used for</th></tr></thead>
+        <tbody>
+          <tr><th scope="row"><a href="https://github.com/IntelRealSense/librealsense" target="_blank" rel="noopener">Intel RealSense SDK (pyrealsense2 2.58)</a></th><td>D405 colour + depth recording, factory intrinsics</td></tr>
+          <tr><th scope="row"><a href="https://opencv.org" target="_blank" rel="noopener">OpenCV 4.11 (ArUco)</a></th><td>marker detection and pose (table frame), video reading, drawing</td></tr>
+          <tr><th scope="row"><a href="https://ai.google.dev/edge/mediapipe/solutions/vision/hand_landmarker" target="_blank" rel="noopener">MediaPipe Hand Landmarker 0.10</a></th><td>21 hand points per frame; starts the hand tracks</td></tr>
+          <tr><th scope="row"><a href="https://github.com/facebookresearch/co-tracker" target="_blank" rel="noopener">CoTracker3 (offline, commit 82e02e8)</a></th><td>tracks the 6 hand and 8 mug points through the video</td></tr>
+          <tr><th scope="row"><a href="https://github.com/facebookresearch/sam2" target="_blank" rel="noopener">SAM 2.1 Hiera-L (commit 2b90b9f)</a></th><td>mug mask in every frame; picks the mug points</td></tr>
+        </tbody>
+      </table>
+    </div>
   </section>
 
   <section id="limitations">
     <h2>Limitations</h2>
-    <p class="todo">Content to come.</p>
+    <ul class="points">
+      <li><strong>Pauses.</strong> They are part of the rim-grasp rules that lift the real2sim success from 19 % to 61 %, but holding the video still is only
+      valid because the scene is static apart from my hand and the mug: nothing else moves on its own while the
+      video is held.</li>
+      <li><strong>Flow vs robot actions.</strong> Retargeting changes the path: the rim-grasp rules add pauses and a
+      descent from above, and the arm lags the target by about 0.2 s. So the action flow is not exactly what the
+      robot did.</li>
+      <li><strong>Fixed grasp point.</strong> The robot always grasps the same spot on the rim, not where my hand
+      grasped the mug.</li>
+      <li><strong>Mug and plate positions</strong> come from where I pinch and let go, not from calibrated 3D object
+      detection (the D405 gives almost no depth on the white mug and saucer).</li>
+      <li><strong>Mug points</strong> are sampled from each episode's first-frame mask, so they sit in different places
+      on the mug from one episode to the next (sometimes on the handle).</li>
+      <li><strong>Cup positions are clustered.</strong> 74 % of the successful episodes start with the cup between
+      y = −20 and −50 cm, where 68 % of recordings succeed. Beyond −60 cm only 44 % succeed, and above −20 cm
+      1 of 4.</li>
+    </ul>
   </section>
 </main>
 
