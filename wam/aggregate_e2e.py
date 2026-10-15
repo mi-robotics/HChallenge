@@ -30,16 +30,20 @@ def row(runs):
 
 
 out = {}
-rec = json.loads((ROOT / "outputs/s1/ablation" / POLICY / "eval_ckpt_20000.json").read_text())["per_episode"]
+run = ROOT / "outputs/s1/ablation" / POLICY
+rec_file = run / "eval_ckpt_20000_x5.json"  # 5 attempts per seed, as on the Policy page; else the 1-attempt eval
+rec = json.loads((rec_file if rec_file.exists() else run / "eval_ckpt_20000.json").read_text())["per_episode"]
 out["recorded flow"] = {"test": row(rates(rec, ["val", "test"])), "train": row(rates(rec, ["train"])),
                         "failed": row(rates(rec, ["failed"]))}
-for name, run, d in GENS:
+for name, gen, d in GENS:
+    if not (ROOT / "outputs/wam" / gen / d).exists():  # e.g. only v1 trained
+        continue
     for tag in ("", "_pauses"):
         test = []
         for k in range(5):
-            p = ROOT / "outputs/wam" / run / (d if k == 0 else f"{d}_s{k}") / f"eval_{POLICY}{tag}_val-test_5seeds.json"
+            p = ROOT / "outputs/wam" / gen / (d if k == 0 else f"{d}_s{k}") / f"eval_{POLICY}{tag}_val-test_5seeds.json"
             test += rates(json.loads(p.read_text())["per_episode"], ["val", "test"])
-        tf = json.loads((ROOT / "outputs/wam" / run / d / f"eval_{POLICY}{tag}_train-failed_5seeds.json").read_text())["per_episode"]
+        tf = json.loads((ROOT / "outputs/wam" / gen / d / f"eval_{POLICY}{tag}_train-failed_5seeds.json").read_text())["per_episode"]
         out[name + (" + pauses" if tag else "")] = {"test": row(test), "train": row(rates(tf, ["train"])),
                                                    "failed": row(rates(tf, ["failed"]))}
 (ROOT / "outputs/wam" / ("e2e_summary.json" if POLICY == DEFAULT else f"e2e_summary_{POLICY}.json")).write_text(json.dumps(out, indent=1))

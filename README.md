@@ -17,10 +17,25 @@ flow-conditioned policy carries it out in sim.
 ├── policy/         flow-conditioned action policy (flow matching, DINOv2): train and closed-loop eval in sim
 ├── wam/            world action model: Cosmos-Predict2 fine-tuned (LoRA) to predict video + flow; planning and end-to-end eval
 ├── site/           the project website (GitHub Pages, deployed by .github/workflows/pages.yml)
-├── PROJECT_PLAN.md phases, steps, key decisions and measured results
-├── CLAUDE.md       working notes: environment, conventions
+├── scripts/        setup, data download and preprocessing, training and evaluation (below)
+├── dataset.py      the episodes as the policy and the WAM read them
 └── requirements.txt
 ```
 
 Not in git: `data/` episodes (18.5 GB, see `data/README.md`), `outputs/` (checkpoints, evals) and `third_party/`
-(LIBERO, CoTracker3, SAM 2 and their checkpoints; install steps in `requirements.txt` and `CLAUDE.md`).
+(LIBERO, CoTracker3, SAM 2 and their checkpoints, installed by `scripts/setup.sh`).
+
+## Reproduce
+
+Linux, conda, ffmpeg and an NVIDIA GPU (we used one RTX 5090). Times are for that GPU.
+
+```
+bash scripts/setup.sh             # conda env humanoidschallenge, third-party code and checkpoints
+bash scripts/download_data.sh     # raw recordings from Hugging Face (14 GB) into data/
+bash scripts/preprocess_data.sh   # real2sim replay, robot data and action flow for every episode
+bash scripts/train_policy.sh      # flow-conditioned policy (wrist camera), then its sim evaluation (~1 h)
+bash scripts/train_wam.sh         # world action model v1 (~18 h; Cosmos weights are gated, see setup.sh)
+bash scripts/eval_wam.sh          # end-to-end: WAM plans -> policy in sim, with pauses (~3 h)
+```
+
+Raw data: https://huggingface.co/datasets/mcarroll101/HChallenge-mug-pnp

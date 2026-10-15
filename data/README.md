@@ -67,7 +67,7 @@ is not fully repeatable on borderline set-downs. In that re-recording all 100 ke
 | **total** | **65** |
 
 Batch 2 (40 episodes, index finger inside the mug) kept only 19: the thumb–index gap stayed above the 3 cm
-release threshold, so the robot let go mid-carry. Details per batch: `PROJECT_PLAN.md`, step 4.2 notes.
+release threshold, so the robot let go mid-carry.
 
 ## Frames and clocks
 
@@ -159,10 +159,5 @@ index / middle / pinky knuckle; pinch point = mean of thumb and index tips.
 
 ## Regenerate
 
-```
-python replay/run_dataset.py data/mug_pnp_dataset     # hand track → replay (step 4.2)
-python replay/record_sim.py                           # sim.npz for kept episodes (step 4.3)
-python replay/record_sim.py data/mug_pnp_failed/<ep>  # sim.npz for a failed episode whose replay runs
-python flow/run_flows.py                              # masks → flow → flow_sim.npz + video_sim.mp4 (step 4.4)
-python data/split.py                                  # splits.json (step 4.5)
-```
+The raw recordings (`color.mp4`, `depth.mkv`, `frames.csv`, `meta.json` per episode) are on Hugging Face:
+`scripts/download_data.sh` puts them here, `scripts/preprocess_data.sh` makes everything else.

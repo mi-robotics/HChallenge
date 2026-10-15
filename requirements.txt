@@ -1,40 +1,33 @@
-# Sim (step 1.1). LIBERO itself is installed from source, see CLAUDE.md "Environment".
+# Installed by scripts/setup.sh, after torch 2.7.1 (CUDA 12.8). mediapipe and the third-party repos are installed
+# there too, without their dependencies.
 numpy==1.26.4
+scipy==1.15.3
+opencv-python==4.11.0.86
+pillow==12.3.0
+matplotlib==3.10.9
+# sim: robosuite + what LIBERO imports
 mujoco==3.8.1
 robosuite==1.4.0
 bddl==1.0.1
 easydict==1.13
-opencv-python==4.11.0.86
-pillow==12.3.0
-scipy==1.15.3
-# Camera (step 1.2)
+termcolor==3.3.0
+future==1.0.0
+cloudpickle==3.1.2
+gym==0.26.2
+# camera
 pyrealsense2==2.58.4.10922
-# Hand tracking (step 1.4). Install mediapipe with --no-deps: it asks for opencv-contrib-python,
-# which clashes with robosuite's opencv-python; it only needs cv2.
-#   pip install --no-deps mediapipe==0.10.35
+# mediapipe's dependencies
 absl-py
 flatbuffers
 sounddevice
 certifi
-# LIBERO import-time deps
-termcolor==3.3.0
-future==1.0.0
-matplotlib==3.10.9
-cloudpickle==3.1.2
-gym==0.26.2
-# Phase 3: CoTracker3 (RTX 5090 needs a CUDA 12.8 build):
-#   pip install torch==2.7.1 torchvision==0.22.1 --index-url https://download.pytorch.org/whl/cu128
-#   git clone https://github.com/facebookresearch/co-tracker third_party/co-tracker  (commit 82e02e8)
-#   pip install --no-deps -e third_party/co-tracker --config-settings editable_mode=compat
-#   checkpoint: https://huggingface.co/facebook/cotracker3/resolve/main/scaled_offline.pth -> third_party/cotracker_ckpt/
-# Phase 3: SAM 2 (mug masks):
-#   pip install hydra-core==1.3.2 iopath==0.1.10
-#   git clone https://github.com/facebookresearch/sam2 third_party/sam2  (commit 2b90b9f)
-#   SAM2_BUILD_CUDA=0 pip install --no-deps --no-build-isolation -e third_party/sam2 --config-settings editable_mode=compat
-#   checkpoint: https://dl.fbaipublicfiles.com/segment_anything_2/092824/sam2.1_hiera_large.pt -> third_party/sam2_ckpt/
-# Phase 6: world action model (wam/), Cosmos-Predict2-2B via diffusers + LoRA
+# SAM 2's dependencies
+hydra-core==1.3.2
+iopath==0.1.10
+# world action model
 diffusers==0.41.0
 transformers==5.19.0
 peft==0.21.2
 accelerate==1.15.0
 sentencepiece==0.2.2
+huggingface_hub==1.33.0

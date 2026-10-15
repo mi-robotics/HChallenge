@@ -24,3 +24,7 @@ outputs/
 # Step reports, tracker and their media: kept locally, not in the repo
 docs/
 media/
+
+# Working notes: kept locally, not in the repo
+CLAUDE.md
+PROJECT_PLAN.md
