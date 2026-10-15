@@ -115,3 +115,7 @@ figcaption { font: 13px/1.5 var(--mono); color: var(--muted); }
 .results tbody th { font-weight: 500; }
 .results tr.pick th, .results tr.pick td { background: var(--pick); }
 .results strong { font-weight: 700; color: var(--fg); }
+.picker .eps { display: flex; flex-wrap: wrap; gap: 6px; }
+.picker .eps button { font: 500 13px var(--mono); min-width: 2.4rem; padding: 6px 10px; border-radius: 6px; border: 1px solid var(--line); background: var(--surface); color: var(--fg); cursor: pointer; }
+.picker .eps button[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: var(--bg); }
+.picker .eps button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }

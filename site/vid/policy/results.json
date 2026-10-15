@@ -1,0 +1,82 @@
+{
+ "20261009_111418": {
+  "split": "test",
+  "seed": 0,
+  "attempt": 0,
+  "Baseline: both cameras": true,
+  "Baseline: wrist camera": false,
+  "Flow-conditioned: wrist camera": true
+ },
+ "20261009_111442": {
+  "split": "test",
+  "seed": 0,
+  "attempt": 0,
+  "Baseline: both cameras": true,
+  "Baseline: wrist camera": false,
+  "Flow-conditioned: wrist camera": true
+ },
+ "20261009_111935": {
+  "split": "val",
+  "seed": 0,
+  "attempt": 3,
+  "Baseline: both cameras": true,
+  "Baseline: wrist camera": false,
+  "Flow-conditioned: wrist camera": true
+ },
+ "20261009_123216": {
+  "split": "val",
+  "seed": 0,
+  "attempt": 0,
+  "Baseline: both cameras": true,
+  "Baseline: wrist camera": false,
+  "Flow-conditioned: wrist camera": true
+ },
+ "20261009_123259": {
+  "split": "test",
+  "seed": 0,
+  "attempt": 1,
+  "Baseline: both cameras": true,
+  "Baseline: wrist camera": false,
+  "Flow-conditioned: wrist camera": true
+ },
+ "20261009_125024": {
+  "split": "val",
+  "seed": 0,
+  "attempt": 0,
+  "Baseline: both cameras": true,
+  "Baseline: wrist camera": false,
+  "Flow-conditioned: wrist camera": true
+ },
+ "20261009_125038": {
+  "split": "test",
+  "seed": 0,
+  "attempt": 0,
+  "Baseline: both cameras": true,
+  "Baseline: wrist camera": false,
+  "Flow-conditioned: wrist camera": true
+ },
+ "20261009_125236": {
+  "split": "val",
+  "seed": 0,
+  "attempt": 1,
+  "Baseline: both cameras": true,
+  "Baseline: wrist camera": false,
+  "Flow-conditioned: wrist camera": true
+ },
+ "20261009_125318": {
+  "split": "val",
+  "seed": 0,
+  "attempt": 1,
+  "Baseline: both cameras": true,
+  "Baseline: wrist camera": false,
+  "Flow-conditioned: wrist camera": true
+ },
+ "20261009_125332": {
+  "split": "val",
+  "seed": 0,
+  "attempt": 4,
+  "Baseline: both cameras": true,
+  "Baseline: wrist camera": false,
+  "Flow-conditioned: wrist camera": true
+ }
+}

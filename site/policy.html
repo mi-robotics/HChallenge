@@ -82,6 +82,18 @@
         </tbody>
       </table>
       </div>
+    <ul class="points">
+      <li>Baselines are standard visuomotor policies: the same model with no action flow conditioning.</li>
+      <li>The baseline with only the wrist camera scores poorly: 59 % train / 37 % test, against 84 % / 78 % with both
+      cameras.</li>
+      <li>Adding the action flow to the wrist camera raises it to 92 % / 77 %: close to the two-camera baseline on test,
+      and better on train.</li>
+      <li>So the flow-conditioned policy's performance comes from the action flow conditioning, not from the image
+      observations.</li>
+      <li>Interestingly, the baselines do surprisingly well on the episodes that failed in our data collection (42 %),
+      while the flow-conditioned policies fail on them (7 %): they follow the flow, and the flow is of a failed
+      replay.</li>
+    </ul>
     <h3 class="sub">All runs</h3>
       <div class="scroll">
       <table class="stats results">
@@ -127,12 +139,48 @@
 
   <section id="visualizations">
     <h2>Visualizations</h2>
-    <p class="todo">Content to come.</p>
+    <ul class="points">
+      <li>10 val and test episodes, chosen where, in the same eval run (same seed and attempt for all three), the
+      baseline with the wrist camera fails while the baseline with both cameras and the flow-conditioned policy succeed.
+      Of the 20 val and test episodes, 17 have such a run; these are the 10 where it happens most often.</li>
+      <li>Each column: the sim's third-person camera on top, the wrist camera below. Success is LIBERO's cup-on-plate
+      check after 1 s.</li>
+    </ul>
+    <figure class="episode picker">
+      <div class="eps" role="group" aria-label="Episode">
+        <button type="button" data-ep="20261009_111418" aria-pressed="true">1</button>
+        <button type="button" data-ep="20261009_111442" aria-pressed="false">2</button>
+        <button type="button" data-ep="20261009_111935" aria-pressed="false">3</button>
+        <button type="button" data-ep="20261009_123216" aria-pressed="false">4</button>
+        <button type="button" data-ep="20261009_123259" aria-pressed="false">5</button>
+        <button type="button" data-ep="20261009_125024" aria-pressed="false">6</button>
+        <button type="button" data-ep="20261009_125038" aria-pressed="false">7</button>
+        <button type="button" data-ep="20261009_125236" aria-pressed="false">8</button>
+        <button type="button" data-ep="20261009_125318" aria-pressed="false">9</button>
+        <button type="button" data-ep="20261009_125332" aria-pressed="false">10</button>
+      </div>
+      <video id="pv" src="vid/policy/20261009_111418.mp4" autoplay muted loop playsinline controls style="aspect-ratio:784 / 560; max-width:49rem"></video>
+      <figcaption id="pvcap">Episode 20261009_111418</figcaption>
+    </figure>
+    <script>
+      document.querySelectorAll('.picker .eps button').forEach(b => b.addEventListener('click', () => {
+        document.querySelectorAll('.picker .eps button').forEach(x => x.setAttribute('aria-pressed', x === b));
+        const v = document.getElementById('pv'); v.src = 'vid/policy/' + b.dataset.ep + '.mp4'; v.play();
+        document.getElementById('pvcap').textContent = 'Episode ' + b.dataset.ep;
+      }));
+    </script>
   </section>
 
   <section id="third-party-dependencies">
     <h2>Third-party dependencies</h2>
-    <p class="todo">Content to come.</p>
+    <div class="scroll">
+      <table class="stats deps">
+        <thead><tr><th>tool</th><th>used for</th></tr></thead>
+        <tbody>
+          <tr><th scope="row"><a href="https://github.com/facebookresearch/dinov2" target="_blank" rel="noopener">DINOv2 ViT-S/14</a></th><td>pretrained image encoder (loaded with torch.hub), fine-tuned with the policy</td></tr>
+        </tbody>
+      </table>
+    </div>
   </section>
 
   <section id="limitations">
