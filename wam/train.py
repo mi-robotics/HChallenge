@@ -1,17 +1,12 @@
-"""Fine-tune Cosmos-Predict2-2B (LoRA) to predict the next 1.6 s of my real video and hand + mug flow from the
-current frame and the prompt, on the robot's clock (wam/data.py, wam/model.py).
+"""Fine-tune Cosmos-Predict2-2B with LoRA to predict the next 1.6 s of video and flow from the current frame
+and the prompt (wam/data.py, wam/model.py).
 
-  python wam/train.py --out outputs/wam/v1                       flow + video (v1)
-  python wam/train.py --out outputs/wam/v2_state --state-p 0.5    + the flow's current row given half the time
-  python wam/train.py --out outputs/wam/v3_video --video-only     video only
-  python wam/train.py --base random-tiny --steps 300 --limit 2 --out outputs/wam/smoke   (no weights needed)
+  python wam/train.py --out outputs/wam/v1                       video + flow (v1)
+  python wam/train.py --out outputs/wam/v2_state --state-p 0.5   + the current flow row, given half the time (v2)
+  python wam/train.py --base random-tiny --steps 20 --limit 2 --out <dir>   quick check, no weights needed
 
-The VAE latents of every training sample are encoded once and cached (outputs/wam/cache_*.pt).
-Every --sample-every steps, on val episodes (out/samples/, out/samples.jsonl):
-  - flow error of sampled flows on --val-samples fixed val samples (mm, mean over points and steps),
-    and a video of the first 4: predicted frames + predicted flow | real frames + recorded flow;
-  - chained rollouts from the first frame of --rollouts val episodes, --chunks x 1.6 s (6 = 9.6 s): each chunk
-    starts from the last frame the previous chunk predicted.
+VAE latents are cached (outputs/wam/cache_*.pt). Every --sample-every steps: flow error on fixed val samples and
+chained rollouts from val episodes' first frames (<out>/samples/).
 """
 import argparse
 import json

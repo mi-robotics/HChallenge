@@ -1,12 +1,8 @@
-"""Draw the action flow on the demo video: at every frame, the flow sample that starts there (the next 16 steps at
-10 Hz, 1.5 s) for the 6 hand points and the 8 mug points, projected into the image with the marker pose.
+"""Draw the action flow on the video: at every frame, the next 16 steps (1.6 s) of the 14 points.
 
-  python flow/visualise.py [data/demos/<demo> ...]     (default: all demos)
+  python flow/visualise.py [<episode> ...]     (default: data/demos)
 
-Each trail is one point's future path; dots are the 16 steps, the white ring is step 0 (now). Steps the flow marks
-hidden (visible = 0, position interpolated) are drawn red.
-
-Writes flow_overlay.mp4 to each demo folder and media/phase3/task5/flow.mp4 (all demos tiled, with a legend).
+Dots are the 16 steps, the white ring is now; hidden steps are drawn red. Writes flow_overlay.mp4.
 """
 import json
 import subprocess

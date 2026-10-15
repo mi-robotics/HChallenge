@@ -1,16 +1,6 @@
-"""Action flow format constants (see flow/FORMAT.md) and a shape/value check.
+"""Action flow format constants (flow/FORMAT.md), shape check, and the stand-in mug cylinder used for mug depth.
 
-  python flow/format.py [data/demos/<demo>]     (default: first demo)
-
-Running it builds an episode in this format from stand-in data, checks it, and draws three samples on the camera
-image (media/phase3/task1/flow_samples.jpg):
-  hand  step 1.5 MediaPipe landmarks (until CoTracker, step 3.2)
-  cup   derived from the hand (until step 3.4; the D405 has no depth on the white mug): two rings of 4 points on the
-        camera-facing half of a cylinder (radius CUP_R_M, at 80% and 35% of the grasp height) whose centre is
-        CUP_R_M from the grasp point along thumb -> index (the index tip is inside the mug). The cup is still until the grasp, moves with the pinch point (translation only) until the
-        release, then stays where it was let go. All marked visible. (A rigid fit to the back of the hand, which
-        would also rotate the cup, put the cup base 1-24 cm above the table at release: rotation noise times the
-        hand-to-cup distance. Translation only gives 0.8-2.3 cm, i.e. on the ~1.5 cm saucer.)
+  python flow/format.py [<episode>]    builds a flow from MediaPipe + stand-in mug data, checks it, draws samples
 """
 import json
 import sys

@@ -1,27 +1,12 @@
-"""Train S1: sim cameras + robot state (+ action flow with --flow) -> action chunk (flow matching).
+"""Train the policy: sim cameras + robot state (+ action flow) -> 32-step action chunk (flow matching).
 
-  python policy/train_s1.py [--steps 20000] [--batch 64] [--cameras agentview eye_in_hand] [--img-aug]
-                            [--flow hand|full] [--flow-frame eef|world] [--flow-drop 0.2] [--obs-pos-embed]
-                            [--no-img-pos-embed] [--out outputs/s1/<name>]
+  python policy/train_s1.py [--cameras agentview eye_in_hand] [--flow hand|full] [--img-aug] [--obs-pos-embed]
+                            [--no-img-pos-embed] [--flow-frame eef|world] [--flow-drop 0.2] [--out outputs/s1/<name>]
 
-Data: the train split of data/splits.json (kept episodes), from sim.npz, held on the GPU (uint8 images: 80 episodes
-x ~185 steps x 2 cameras x 256 x 256 x 3 = 5.8 GB). One sample = the observation at step i and actions i .. i+31,
-padded (and masked out of the loss) past the episode end.
-  cameras  --cameras (default both): agentview (third person), eye_in_hand (gripper), 256 x 256 -> 224 for DINOv2;
-           none = state (+ flow) only
-  state    eef_pos [3], eef_quat [4], gripper_qpos [2]
-  action   action[:, [0, 1, 2, 6]]: OSC delta xyz and gripper (the rotation dims are always 0 in the data)
-  flow     flow_sim.npz rows i, i+2, .., i+30 (16 steps at 10 Hz = the 1.6 s of the action chunk, last row repeated
-           past the episode end) of the 6 hand points (--flow hand) or hand + 8 mug points (--flow full), each
-           (x, y, z, visible); xyz moved into the sim world by sim.npz sim_minus_real and taken relative to the
-           current eef_pos (--flow-frame eef, default) or left in the sim world (--flow-frame world: the robot base
-           frame up to a constant offset, which the z-scoring removes) -> 16 tokens of 24 / 56 values
-State, actions and flow xyz are z-scored with train-split statistics (visible stays 0 / 1). --img-aug applies LeRobot's default image transforms
-(lerobot/datasets/transforms.py ImageTransformsConfig, off by default there; HVLA's S1 training uses none) to each
-training image independently: 3 of {brightness 0.8-1.2, contrast 0.8-1.2, saturation 0.5-1.5, hue +-0.05,
-sharpness 0.5-1.5, affine +-5 deg / +-5 % shift}, drawn with equal weights, applied in that order. Written as
-batched GPU ops with torchvision's formulas (per image in a loop, torchvision's own took 0.4 s per batch). Val loss on 1024 fixed val-split samples every
---val-every steps. Writes <out>/train.log, <out>/ckpt_<step>.pt and <out>/last.pt (model, config, norm stats).
+Data: the train split (dataset.py), held on the GPU. A sample is the observation at step i and actions i .. i+31.
+Flow: rows i, i+2, ..., i+30 of 6 hand (hand) or 14 hand + mug (full) points, moved into the sim world and taken
+relative to the gripper (--flow-frame eef). State, actions and flow are z-scored. --img-aug: LeRobot's default image
+transforms, as batched GPU ops. Writes <out>/train.log and <out>/ckpt_<step>.pt (model, config, norm stats).
 """
 import argparse
 import json

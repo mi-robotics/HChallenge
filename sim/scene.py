@@ -1,7 +1,6 @@
-"""Cup-on-plate sim scene: Panda + table + mug + plate in LIBERO, and helpers to move the gripper.
+"""Cup-on-plate scene: Panda, table, mug and plate in LIBERO, and helpers to move the gripper.
 
-Run `python sim/scene.py` to check the scene: free-space target accuracy, then a scripted
-rim-grasp pick-and-place. Saves an MP4 of the pick-and-place to media/phase1/task1/.
+  python sim/scene.py    checks target accuracy, then runs a scripted rim-grasp pick-and-place
 """
 import subprocess
 from pathlib import Path
@@ -101,7 +100,7 @@ def set_camera(env, name, pos, R_world_from_cv, fovy_deg):
     env.env.sim.forward()  # the renderer reads the camera's world pose from data, updated by forward()
 
 
-# Third-person camera for the dataset (step 4.3): LIBERO's agentview moved back and up so every plate position in the
+# Third-person camera for the dataset: LIBERO's agentview moved back and up so every plate position in the
 # recorded episodes (sim x -0.42..0.18, y -0.53..0.55) stays in view: looks at the workspace centre from 50 degrees
 # above the table, 1.7 m away, from the side opposite the robot.
 THIRD_PERSON = {"name": "agentview", "target": (-0.12, 0.0, 0.45), "elevation_deg": 50, "distance_m": 1.7, "fovy_deg": 45}

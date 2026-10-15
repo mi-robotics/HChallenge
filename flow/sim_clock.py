@@ -1,17 +1,10 @@
-"""Put an episode's flow and real video on the robot's clock: one row / frame per sim.npz control step (20 Hz), so
-video, flow and robot data have the same length and pause together.
+"""Put an episode's flow and real video on the robot's clock: one row / frame per sim.npz control step (20 Hz).
 
-  python flow/sim_clock.py [<episode> ...]     (default: every episode in mug_pnp_dataset and mug_pnp_failed with sim.npz)
+  python flow/sim_clock.py [<episode> ...]     (default: every episode with sim.npz and flow.npz)
 
-Each sim step follows the real video at time t_real (sim.npz). The flow points at that step are flow.npz interpolated
-at t_real: during the steps the replay inserts (settle and close at the grasp, hold and rise after the release, the
-final 1 s wait) t_real holds, so the points stand still while the robot moves. Writes flow_sim.npz:
-  t     [N]          sim time, step / 20 Hz (N = len(sim.npz action))
-  t_real [N]         copied from sim.npz
-  frame [N]          color.mp4 frame shown at each step (nearest camera frame to t_real)
-  hand  [6, N, 4], cup [8, N, 4]   table frame, as flow.npz (add sim.npz sim_minus_real for the sim world)
-Sample at sim step i (FORMAT.md, 16 steps at 10 Hz of robot time) = hand[:, i:i+32:2], last row repeated past the end.
-Also writes video_sim.mp4: color.mp4 frames[frame], 1280 x 720 at 20 fps (one video frame per sim step).
+Each sim step follows the real video at time t_real (sim.npz); the flow is flow.npz interpolated at t_real, so it
+holds still while the replay pauses. Writes flow_sim.npz (t, t_real, frame [N]; hand [6, N, 4], cup [8, N, 4],
+table frame) and video_sim.mp4 (one camera frame per sim step, 20 fps).
 """
 import subprocess
 import sys

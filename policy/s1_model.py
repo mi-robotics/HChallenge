@@ -1,25 +1,12 @@
-"""Flow-matching S1 action policy, extracted from HVLA (TheWisp/lerobot, src/lerobot/policies/hvla/s1/flow_matching,
-commit 13f05f3, Apache-2.0), without S2.
+"""Flow-matching action policy, adapted from HVLA's S1 (TheWisp/lerobot, commit 13f05f3, Apache-2.0).
 
-  context = transformer encoder over [DINOv2 patch tokens of each camera, robot-state token, optional flow tokens]
-  decoder = transformer decoder: noisy action chunk (+ flow time) cross-attends to the context, predicts the velocity
+  context = transformer encoder over [DINOv2 patch tokens per camera, robot-state token, flow tokens]
+  decoder = transformer decoder: the noisy action chunk (+ flow-matching time) cross-attends to the context
 
-Flow matching (Lipman et al. 2023, as in pi0): x_t = t * noise + (1 - t) * actions, target v = noise - actions;
-inference integrates from noise (t = 1) to actions (t = 0) with Euler steps.
-
-Kept from HVLA: the architecture and sizes (hidden 768, 8 heads, 4 encoder + 6 decoder layers, DINOv2 ViT-S/14
-fine-tuned with gradient checkpointing), action + time fusion by concat -> MLP(SiLU), Beta(1.5, 1) time sampling,
-15 Euler steps. Removed: the S2 latent token and its age embedding, training-time RTC (the sim waits for the policy,
-so there is no inference delay to train for), saliency, checkpoint feature contracts. Changed: images are normalised
-with the ImageNet mean / std DINOv2 was trained with (HVLA feeds [0, 1] pixels).
-Added (both off by default, so the image-only checkpoints load unchanged):
-  flow_dim > 0     flow_steps tokens, one per future flow step, each a linear projection of that step's flow_dim values
-  n_cameras = 0    no image tokens and no DINOv2 (state / flow only)
-  obs_pos_embed    a learned embedding per context-token position, added before the obs encoder (HVLA has none, so
-                   the encoder could not tell the two cameras apart except by content, nor order the flow steps)
-  img_pos_embed    False: that embedding only on the state and flow tokens, not the image patches
-  flow_drop        training only: with this probability per sample, all flow tokens are replaced by a learned mask
-                   token, so the model also has to act from the images and state alone
+Flow matching: x_t = t * noise + (1 - t) * actions, target v = noise - actions; sampling integrates from t = 1 to
+t = 0 with Euler steps. Options: flow_dim (one token per future flow step), n_cameras = 0 (no images),
+obs_pos_embed / img_pos_embed (learned position embedding on the context tokens), flow_drop (training-time dropout
+of the whole flow).
 """
 import math
 from dataclasses import asdict, dataclass

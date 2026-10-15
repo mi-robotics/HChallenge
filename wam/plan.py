@@ -1,12 +1,10 @@
-"""Plan whole episodes with the WAM for the end-to-end test (step 6.3): from the episode's first real frame, chained
-1.6 s chunks (wam/train.py rollout) until the policy's horizon is covered (recorded length + 3 s, as policy/eval_s1.py).
+"""Plan whole episodes with the WAM from their first real frame, for the end-to-end eval.
 
-  python wam/plan.py outputs/wam/v1/lora_20000.pt --out outputs/wam/v1/e2e      -> <out>/plans/<episode>.npz, .mp4
+  python wam/plan.py outputs/wam/v1/lora_20000.pt --out outputs/wam/v1/e2e [--given-state] [--seed 0]
 
-Per episode: <episode>.npz flow [16 chunks, 14, 4] (table frame, 10 Hz: row j is sim step 2 j) and <episode>.mp4,
-the generated frames (10 Hz, frame 0 = the real first frame). policy/eval_s1.py --plan <out> reads them.
---given-state (layouts with a state slot): the first chunk also gets the recorded flow row at frame 0 (the hand and
-mug where they are in the first frame).
+Chained 1.6 s chunks (each starts from the previous chunk's last frame and flow row) until the policy's horizon is
+covered. Writes <out>/plans/<episode>.npz (flow, 10 Hz) and .mp4 (generated video); policy/eval_s1.py --plan reads
+them. --given-state: the first chunk also gets the ground truth flow row at frame 0.
 """
 import argparse
 import json

@@ -1,12 +1,10 @@
-"""Split the dataset by episode (step 4.5). Writes data/splits.json.
+"""Split the dataset by episode into data/splits.json.
 
   python data/split.py
 
-The 100 kept episodes are shuffled (seed 0) into train (80), val (10) and test (10). Failed episodes are listed
-apart: failed (replayed in sim, so they have robot data, paired video and flow) and failed_no_robot (no grasp in the
-hand track or the hand was lost, so no replay: real-clock flow only).
-Also writes media/phase4/task5/splits.png (top view of the cup start positions by split; cup position = mean xy of
-the 8 mug flow points at step 0, table frame).
+Kept episodes are shuffled (seed 0) into train (80), val (10) and test (10). Failed episodes are listed apart:
+failed (replayed in sim, so they have robot data) and failed_no_robot (no usable hand track, flow only).
+Also plots the cup start positions by split.
 """
 import json
 from pathlib import Path

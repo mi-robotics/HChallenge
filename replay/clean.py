@@ -1,16 +1,9 @@
-"""Clean the table-frame hand trajectory and resample it to the sim control rate (20 Hz).
+"""Clean the table-frame hand trajectory and resample it to 20 Hz.
 
-  python replay/clean.py [data/demos/<demo> ...]     (default: all demos)
+  python replay/clean.py [<episode> ...]     (default: data/demos)
 
-Per keypoint (wrist, thumb tip, index tip):
-  1. drop spikes: samples > 3 cm from a 7-frame rolling median, or below the table (z < -1 cm)
-  2. fill gaps up to 1.5 s by linear interpolation (ends: hold the nearest sample)
-  3. smooth with a zero-phase Gaussian (sigma 2 frames = 67 ms; offline, so no lag)
-  4. resample to 20 Hz on the camera timestamps
-Writes traj.npz to each demo folder:
-  t [N] s, wrist/thumb/index [N,3] metres (table frame), aperture [N] metres (thumb-index tip distance),
-  filled [N] (sample comes from a gap or a dropped spike)
-and media/phase1/task6/clean.png (raw vs cleaned for one demo).
+Per keypoint: drop spikes (> 3 cm from a rolling median, or below the table), fill gaps up to 1.5 s, smooth with a
+zero-phase Gaussian, resample to 20 Hz. Writes traj.npz (t, wrist / thumb / index [N, 3], aperture, filled).
 """
 import sys
 from pathlib import Path

@@ -1,12 +1,7 @@
-"""Training samples for the world action model, all on the robot's clock (20 Hz, with the replay's pauses):
-video_sim.mp4 (my real colour video, frame i = the camera frame sim step i follows) and flow_sim.npz (row i = the
-hand + mug flow at that moment), see data/README.md.
+"""World action model training samples: the real video and the flow, both on the robot's clock (dataset.py).
 
-A sample at step i:
-  frames [17, H, W, 3] uint8   video frames i, i+2, ..., i+32 (now + 16 future frames at 10 Hz = 1.6 s)
-  flow   [16, 14, 4] float   flow rows i, i+2, ..., i+30 (the S1 policy's flow input): 6 hand + 8 mug points,
-                             x y z in the table frame (metres) + visible (0/1)
-Rows past the end repeat the last one, as in the policy (FORMAT.md).
+A sample at step i: frames [17, 256, 448, 3] (frames i, i+2, ..., i+32: now + 1.6 s at 10 Hz) and flow [16, 14, 4]
+(rows i, i+2, ..., i+30, the policy's flow input). Rows past the end repeat the last one.
 """
 import sys
 from concurrent.futures import ThreadPoolExecutor

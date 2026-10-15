@@ -1,5 +1,5 @@
-"""Draw a flow sample [16, 14, 4] (table frame) on 256 x 448 frames with the episode's marker pose; the end-to-end
-videos (step 6.3)."""
+"""Draw a flow sample on video frames with the episode's marker pose, and the end-to-end eval videos.
+"""
 import json
 import sys
 import subprocess

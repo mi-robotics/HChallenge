@@ -1,19 +1,10 @@
 """Match the sim's starting scene to each demo.
 
-  python replay/scene_match.py [data/demos/<demo> ...]     (default: all demos)
+  python replay/scene_match.py [<episode> ...]     (default: data/demos)
 
-The mug and saucer are white, and the D405 returns almost no depth on blank white surfaces, so they
-are located from the hand instead (step 1.7): the pinch point at the grasp is on the cup, the pinch
-point at the release is over the saucer's centre. The cup moves rigidly in the hand, so the plate sits
-at (release - grasp) from the cup:
-    sim cup   = SIM_CUP_XY                         (centre of the BDDL cup region)
-    sim plate = SIM_CUP_XY + (release - grasp)_xy
-Checks: the grasp point and the release point (dropped to saucer height) projected into the first camera
-frame should land on the mug and saucer; every replay target within the Panda's reach and above the table.
-A sim camera is put where the D405 is, relative to the cup (same pose, same vertical field of view), so
-real and sim views can be compared side by side.
-
-Writes scene.json to each demo folder and media/phase1/task8/scene_match.jpg.
+The mug and plate are white (no D405 depth), so they come from the hand: the pinch point at the grasp is on the cup,
+at the release over the plate. sim cup = SIM_CUP_XY, sim plate = SIM_CUP_XY + (release - grasp)_xy. A sim camera
+is placed at the D405's pose for side-by-side videos. Writes scene.json.
 """
 import json
 import sys

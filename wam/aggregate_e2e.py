@@ -1,12 +1,10 @@
-"""Step 6.3 results over plan seeds x policy seeds.
+"""End-to-end results (WAM plan -> policy) over plan seeds x policy seeds.
 
-  python wam/aggregate_e2e.py [policy run, default full_wrist_state_no_img_pos]
+  python wam/aggregate_e2e.py [policy run]     (default full_wrist_state_no_img_pos)
 
-Per generator (v1, v2, v2 + recorded first flow row) and with / without pauses: success % per (plan seed, policy
-seed) over the episodes of a split, then mean +- std over those runs. val and test are pooled as "test" (20
-episodes; 5 plan seeds x 5 policy seeds = 25 runs). train and failed use the plan seed 0 plans only (5 runs).
-Recorded flow = the step 5 eval of the same policy (5 policy seeds). Writes outputs/wam/e2e_summary.json
-(e2e_summary_<policy>.json for another policy).
+Per WAM (v1, v2, v2 + ground truth first flow row), with and without pauses: success % per (plan seed, policy seed),
+then mean +- std. Test pools val and test (5 plan seeds x 5 policy seeds); train and failed use plan seed 0.
+Writes outputs/wam/e2e_summary[_<policy>].json.
 """
 import json
 import sys

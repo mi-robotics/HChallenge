@@ -1,22 +1,10 @@
-"""Replay kept episodes in sim and save what the robot did and saw, per control step (20 Hz), to sim.npz.
+"""Replay kept episodes in sim and save what the robot did and saw per control step (20 Hz) to sim.npz.
 
-  python replay/record_sim.py [--video out.mp4] [data/mug_pnp_dataset/<episode> ...]   (default: all kept episodes)
+  python replay/record_sim.py [--video out.mp4 [--flow]] [<episode> ...]   (default: all kept episodes)
 
-Same replay as step 4.2 (replay/replay.py, all rim-grasp constraints), with record=True. sim.npz per episode:
-  action [N,7]         the OSC_POSE delta action sent (xyz in [-1, 1] = +-5 cm, rotation 0, gripper -1 open / +1 close)
-  joint_pos, joint_vel [N,7], gripper_qpos [N,2]          proprioception, observed before the action
-  eef_pos [N,3], eef_quat [N,4]                           end-effector pose (world frame)
-  cup_pos, cup_quat, plate_pos                            object state
-  agentview [N,256,256,3], eye_in_hand [N,256,256,3]      third-person (sim/scene.py THIRD_PERSON: moved back and up
-                                                          so the whole workspace is in view) and gripper camera, uint8 RGB
-  t_real [N]           time in the real video of the hand sample each step follows (s); the inserted settle /
-                       lift-out steps and the final 1 s hold the time, so steps are not evenly spaced in t_real
-  sim_minus_real [3]   offset from the table frame to the sim world (sim grasp point - real grasp point): adding it
-                       to the hand flow puts the flow on the robot's path
-  success, hz, sim_plate_xy
---video renders, for the episodes given, the real video next to the two sim cameras, one row per episode.
---flow (with --video) draws the action flow on the robot's clock (flow_sim.npz, flow/sim_clock.py) on both: projected
-into the real camera, and into the sim third-person camera after moving it into the sim world by sim_minus_real.
+sim.npz: action [N, 7], joint_pos / joint_vel, gripper_qpos, eef_pos / eef_quat, cup and plate state, agentview and
+eye_in_hand images [N, 256, 256, 3], t_real (time in the real video each step follows), sim_minus_real (table frame
+-> sim world offset), success. --video renders the real video next to both sim cameras; --flow draws the flow.
 """
 import subprocess
 import sys

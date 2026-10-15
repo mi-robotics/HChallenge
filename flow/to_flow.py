@@ -1,26 +1,11 @@
-"""CoTracker tracks (step 3.2) -> action flow in the table frame, in the flow/FORMAT.md format.
+"""CoTracker tracks -> action flow in the table frame (flow/FORMAT.md).
 
-  python flow/to_flow.py [data/demos/<demo> ...]     (default: all demos)
+  python flow/to_flow.py [<episode> ...]     (default: data/demos)
 
-Hand: tracked pixel + D405 depth at that pixel (median of a 7x7 patch), then the marker pose, as in step 1.5.
-Mug: tracked pixel (points from the SAM 2 mask, flow/track_points.py) + depth where the pixel's camera ray meets the
-stand-in mug, a 4 cm-radius vertical cylinder that moves with the CoTracker pinch point while the mug moves (timing from
-the SAM 2 mask since step 4.4, flow/format.py hold_times; flow/format.py cup_cylinder;
-the D405 has no depth on the white mug). Rays that miss the cylinder (e.g. on the handle) take the point of closest
-approach to its axis; rays that would meet it above the rim (mask points inside the mug, seen through the opening)
-take the point where they cross the rim plane. So the mug's image position comes from tracking and only its distance from the camera from the
-hand. (Depth from PnP on the tracked mug points drifts during the carry, PROJECT_PLAN.md 3.4.)
-Then sampled at 10 Hz: each step is the mean of the visible camera frames within +-50 ms (about 3 frames; taking
-only the nearest frame left about twice the frame-to-frame jitter of the smoothed step 1.6 path). visible = the step
-3.2 occlusion check (any visible frame in the window). Hidden hand points: linear interpolation. Hidden mug points
-move with the mug's visible points (their mean + this point's offset from it at the nearest step where it was
-visible); plain interpolation drew hidden mug points across empty table over hidden runs of up to 3 s.
-
-Checks: pinch point (thumb/index midpoint) vs the step 1.6 MediaPipe trajectory (outside MediaPipe's gaps, where
-step 1.6 only interpolates; in demo 5's 0.7 s gap the tracks show the hand swinging ~10 cm towards the camera, which
-the interpolation misses), frame-to-frame jitter, points below the table, mug height at release.
-
-Writes flow.npz to each demo folder and media/phase3/task3/flow_table.png.
+Hand points: tracked pixel + D405 depth (median of a 7 x 7 patch), through the marker pose into the table frame.
+Mug points: tracked pixel + depth where the camera ray meets a 4 cm-radius cylinder that moves with the pinch point
+(the D405 has no depth on the white mug). Sampled at 10 Hz; hidden hand points are interpolated, hidden mug points
+move with the visible ones. Writes flow.npz.
 """
 import json
 import sys

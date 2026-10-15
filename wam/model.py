@@ -1,17 +1,10 @@
-"""World action model: Cosmos-Predict2-2B Video2World with the flow written into one extra latent frame (the
-Cosmos Policy trick, arXiv 2601.16163: a small vector is tiled to fill a latent frame and averaged back out).
+"""World action model: Cosmos-Predict2-2B Video2World with the flow written into extra latent frames (the Cosmos
+Policy trick, arXiv 2601.16163: a small vector is tiled to fill a latent frame and averaged back out).
 
-Latent sequence (Wan2.1 VAE: frame 0 -> 1 latent, then 4 frames -> 1 latent; 8x smaller in H and W), see Layout:
-  [0]    frame now                                     given (clean)
-  [1-4]  16 future frames at 10 Hz (1.6 s)             predicted
-  [5]    flow, 16 steps x 14 points x 4 (optional)     predicted
-  [6]    flow state now, 14 points x 4 (optional)      given or predicted
-Flow and state come after the video so the video keeps the temporal positions it was pretrained with and the VAE
-(causal in time) decodes the video latents without them.
-
-Noise and parametrisation follow diffusers' Cosmos2VideoToWorldPipeline: x_t = (1 - t) x0 + t eps with
-t = sigma / (1 + sigma); the transformer outputs v = eps - x0, so x0 = x_t - t v. Conditioning frames are passed
-clean with t = 1e-4 / (1 + 1e-4) and condition_mask = 1. Training draws sigma ~ lognormal(1.386, 1.2) (Cosmos Policy).
+Latent frames (Layout): [0] frame now (given), [1-4] 16 future frames (predicted), [5] flow 16 x 14 x 4
+(predicted), [6] optional flow state, the current flow row (given or predicted). Flow and state come after the
+video so the video keeps its pretrained positions. Noise and parametrisation follow diffusers'
+Cosmos2VideoToWorldPipeline; training draws sigma ~ lognormal(1.386, 1.2).
 """
 import torch
 from diffusers import AutoencoderKLWan, CosmosTransformer3DModel

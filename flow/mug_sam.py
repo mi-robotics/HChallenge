@@ -1,21 +1,11 @@
 """Segment the mug in every frame with SAM 2, and time when it is picked up and put down.
 
-  python flow/mug_sam.py [episode ...]     (default: data/demos)
+  python flow/mug_sam.py [<episode> ...]     (default: data/demos)
 
-Finding the mug: SAM 2's automatic mode proposes every object in the first frame; the mug is the proposal that looks
-like one (MUG_AREA_PX, MUG_H_OVER_W, fill > MUG_FILL, median grey > MUG_GREY) nearest to where the hand first pinches
-(projected from traj.npz). If none does (the hand covers the mug), the last frame is tried. Clicking at the hand's
-estimate instead hit the table, saucer, hand or cable in 20 of 82 episodes (step 4.2 pilot); proposals found the
-mug in all 8 of those checked. The video predictor then tracks that mask forwards and backwards.
-
-Timing (mug_motion): the mug base per frame = where the ray through the bottom of the mask meets the table plane,
-plus the mug radius away from the camera. Picked up = first of 3 frames > MOVE_M from where it started; put down = last
-frame > MOVE_M from where it ends. Used for the mug flow (flow/format.py hold_times) instead of the hand's
-grasp/release events, which are wrong in many failed episodes.
-
-mask_points() picks the 8 mug points to track (flow/track_points.py). Run this before flow/track_points.py.
-Writes mug_mask.npz to each episode folder: packed boolean masks [T, H, W], frame (where the mug was found),
-t_grasp, t_release (s, camera time).
+The mug is the SAM 2 automatic-mode proposal that looks like a mug (size, aspect, fill, colour) nearest to the
+hand's first pinch; the video predictor tracks that mask through the video. Picked up / put down: when the mask's
+base point on the table first leaves / last returns within MOVE_M of its resting place.
+mask_points() picks the 8 mug points to track. Writes mug_mask.npz: masks [T, H, W], frame, t_grasp, t_release.
 """
 import json
 import shutil
@@ -165,7 +155,7 @@ def load_masks(demo):
 
 
 def mug_frame(demo):
-    """Frame the mug was found in (0 for masks made before step 4.4)."""
+    """Frame the mug was found in (0 for older masks)."""
     m = np.load(Path(demo) / "mug_mask.npz")
     return int(m["frame"]) if "frame" in m else 0
 

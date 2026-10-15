@@ -1,13 +1,11 @@
-"""Hand and mug flow for every recorded episode, kept and failed (step 4.4).
+"""Hand and mug flow for every recorded episode, kept and failed.
 
   python flow/run_flows.py [dataset_dir ...]     (default: data/mug_pnp_dataset data/mug_pnp_failed)
-  python flow/run_flows.py --video out.mp4 <episode> ...   tile the episodes' flow_overlay.mp4 with a legend
+  python flow/run_flows.py --video out.mp4 <episode> ...   tile the episodes' flow_overlay.mp4
 
-Per episode with a hand track (hand.npz): SAM 2 mug masks and timing (flow/mug_sam.py) -> CoTracker hand and mug
-points (flow/track_points.py) -> flow.npz (flow/to_flow.py) -> flow_overlay.mp4 (flow/visualise.py) -> for kept
-episodes with sim.npz (step 4.3), flow_sim.npz on the robot's clock (flow/sim_clock.py). A stage whose
-output exists is skipped; an episode that raises is recorded with the stage and error and the run goes on.
-Writes <dataset>/flow_summary.json.
+Per episode: SAM 2 mug masks (mug_sam) -> CoTracker points (track_points) -> flow.npz (to_flow) ->
+flow_overlay.mp4 (visualise) -> flow_sim.npz on the robot's clock (sim_clock, episodes with sim.npz).
+Finished stages are skipped; errors are recorded and the run continues. Writes <dataset>/flow_summary.json.
 """
 import json
 import sys

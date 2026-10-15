@@ -1,12 +1,9 @@
-"""Track the right hand in recorded demos with MediaPipe, and read D405 depth at each landmark.
+"""Track the right hand with MediaPipe and read the D405 depth at each landmark.
 
-  python replay/track_hand.py [data/demos/<demo> ...]     (default: all demos)
+  python replay/track_hand.py [<episode> ...]     (default: data/demos)
 
-Writes to each demo folder:
-  hand.npz          per frame t: detected [T], score [T], uv [T,21,2] pixels, depth [T,21] metres
-                    (0 = no valid depth), world [T,21,3] MediaPipe's metric 3D hand shape (metres, around the
-                    hand's centre, camera-aligned axes; used for the occlusion check in step 3.2), t_ms [T]
-  hand_overlay.mp4  colour video with the tracked hand drawn on it
+Writes hand.npz (detected, score, uv [T, 21, 2], depth [T, 21], world [T, 21, 3] MediaPipe's metric hand, t_ms)
+and hand_overlay.mp4.
 """
 import csv
 import json

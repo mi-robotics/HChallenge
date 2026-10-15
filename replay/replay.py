@@ -1,23 +1,12 @@
-"""Replay each demo in sim and record a side-by-side video (real | sim from the D405's pose).
+"""Replay a hand demonstration in sim.
 
-  python replay/replay.py [--raw | --only approach,settle,lift] [data/demos/<demo> ...]     (default: all demos)
+  python replay/replay.py [--raw | --only approach,settle,lift] [<episode> ...]     (default: data/demos)
 
-Per demo: matched scene (step 1.8), gripper moved to the first target (not part of the replay), then one
-control step per 20 Hz sample: end-effector target = pinch trajectory anchored at the sim rim-grasp point,
-gripper open/close from the hand (step 1.7). After the last sample the sim runs 1 s more so the cup settles,
-then LIBERO's On(cup, plate) check decides success.
-
-Rim-grasp constraints (default: all three; --raw replays the hand path as is; --only picks a subset for ablations). The robot grasps with one finger inside
-the mug, while I pinch it from the side, so following the hand exactly knocks the mug over on approach and
-drags it off the plate after release. Three local changes, the hand path is kept everywhere else:
-  approach  before the grasp, the target stays >= 8 cm above the grasp point until the gripper itself (not the
-            target: the arm lags fast hand motion) is within 1 cm of it horizontally, then descends
-            (3 cm until step 4.2: with the cup in a new place every episode, a 1-3 cm offset put the finger on the rim)
-  settle    at the grasp point: 0.5 s with fingers open (arrive), then 0.5 s closing (grip), then follow the hand
-  lift out  after release, hold 0.25 s, then rise 10 cm straight up before following the hand again
-
-Writes replay<tag>.mp4 + replay<tag>.json + replay_trace<tag>.npz (per-step target, gripper, cup) to each demo folder
-(tag: "" all constraints, "_raw" none, "_<subset>" otherwise), and media/phase1/task9/replay.mp4 / replay_raw.mp4 (all demos tiled).
+Matched scene, then one control step per 20 Hz sample: the gripper follows the pinch path anchored at the sim
+rim-grasp point, open / close from the hand; LIBERO's On(cup, plate) after 1 s decides success.
+Rim-grasp rules (default all; --raw: none): approach (stay 8 cm above until within 1 cm sideways), settle (0.5 s
+arrive + 0.5 s close at the grasp), lift out (after release, hold 0.25 s and rise 10 cm).
+Writes replay<tag>.mp4, replay<tag>.json and replay_trace<tag>.npz per episode.
 """
 import json
 import subprocess
@@ -77,7 +66,7 @@ def tag(use):
 
 
 def snapshot(obs):
-    """What step 4.3 saves per control step, observed before the action (images turned right way up)."""
+    """What the dataset saves per control step, observed before the action (images turned right way up)."""
     return {"joint_pos": np.arctan2(obs["robot0_joint_pos_sin"], obs["robot0_joint_pos_cos"]),
             "joint_vel": obs["robot0_joint_vel"], "gripper_qpos": obs["robot0_gripper_qpos"],
             "eef_pos": obs["robot0_eef_pos"], "eef_quat": obs["robot0_eef_quat"],
@@ -89,7 +78,7 @@ def snapshot(obs):
 
 def replay(demo, env, use=CONSTRAINTS, record=False):
     """record: also save sim.npz (per control step: observation before the action, the action, real time of the
-    hand sample it came from) for the dataset (step 4.3); needs an env with camera images."""
+    hand sample it came from) for the dataset; needs an env with camera images."""
     demo = Path(demo)
     rt = np.load(demo / "retarget.npz")
     sc = json.loads((demo / "scene.json").read_text())

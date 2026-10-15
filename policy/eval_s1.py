@@ -1,30 +1,15 @@
-"""Closed-loop evaluation of an S1 checkpoint in LIBERO, on the scenes of the dataset's episodes.
+"""Closed-loop evaluation of a policy checkpoint in LIBERO, on the scenes of the dataset's episodes.
 
-  python policy/eval_s1.py <ckpt.pt> [--splits train val test failed] [--seeds 0 1 2 3 4] [--attempts 1] [--workers 6]
-                           [--execute 10] [--denoise 10] [--video out.mp4] [--video-episodes 10] [--plan DIR]
+  python policy/eval_s1.py <ckpt.pt> [--splits train val test failed] [--seeds 0 1 2 3 4] [--attempts 1]
+                           [--execute 10] [--denoise 10] [--workers 6] [--plan DIR [--pauses] [--label TITLE]]
 
-Per episode: the scene that episode was recorded in (sim cup and plate from scene.json, cameras as in step 4.3), the
-gripper driven to where the recorded episode started (sim.npz eef_pos[0], fingers open; the replay starts there too),
-then the policy runs: predict a 32-step chunk from the two cameras + state (--denoise Euler steps), execute the first
---execute actions, repeat. The episode gets the recorded length + 3 s, then 1 s of zero actions for the cup to settle,
-then LIBERO's On(cup, plate) decides success. Every (split, seed, attempt, episode) is one run; seed s, attempt a set
-the flow-matching noise (torch seed 1000 * s + episode index + 1e6 * a, so attempt 0 is the 1-attempt eval), the sim
-itself is deterministic. Runs are spread over --workers processes, each with its own model and env. Per split:
-success rate per seed (over its episodes x attempts), then mean +- std over the seeds.
-A flow checkpoint (--flow hand / full in training) gets, at every prediction at step i, the episode's recorded flow
-(hand, or hand + mug) from flow_sim.npz rows i, i+2, .., i+30 (last row repeated past the end), indexed by sim time, not by progress.
-Trail error (every model): median distance from the gripper to the flow's pinch point (thumb / index tip midpoint,
-in the sim world) at the same step, over the recorded length; for the recorded replay itself it is printed as
-"replay" (the gripper lags the target by ~0.2 s, step 4.4).
-Writes <ckpt dir>/eval_<ckpt name>.json (eval_<ckpt name>_x<attempts>.json for --attempts > 1); --video tiles the third-person view of the first --video-episodes test
-episodes, seed 0.
---plan DIR (end-to-end test, step 6.3): the flow comes from the WAM's plan DIR/plans/<episode>.npz (wam/plan.py,
-10 Hz rows, row j = sim step 2 j; the policy is only queried at even steps) instead of the recorded flow; writes
-DIR/eval_<policy run>[_pauses][_<splits>][_<n>seeds].json, and --label writes DIR/videos/<episode>.mp4 for the first --video-episodes test episodes:
-real video + recorded flow | generated video + planned flow | robot wrist camera | robot third-person camera
-(wam/render.py).
---pauses (with --plan): insert the replay's pauses into the plan (add_pauses), DIR/eval_<policy run>_pauses.json and
-DIR/videos_pauses/.
+Per episode: the episode's sim scene, the gripper at its start pose, then: predict 32 actions, run the first
+--execute, repeat, for the recorded length + 3 s; LIBERO's On(cup, plate) after 1 s decides success. Flow policies
+get the episode's ground truth flow (flow_sim.npz rows i, i+2, ..., i+30 at step i). Seed and attempt set the
+flow-matching noise; the sim is deterministic. Per split: success rate per seed, then mean +- std over seeds.
+Writes <ckpt dir>/eval_<ckpt>.json.
+--plan DIR: the flow comes from the WAM's plans (wam/plan.py) instead; writes DIR/eval_<policy>[_pauses][...].json.
+--pauses inserts the replay's grasp and release pauses into the plan. --label writes videos (wam/render.py).
 """
 import argparse
 import json
@@ -70,7 +55,7 @@ def add_pauses(pts):
     """Plan [N, 14, 4] at sim steps -> (plan with the replay's pauses, source step per row), as the robot clock puts them
     into the recorded flow (replay.rim_grasp_constraints, flow/sim_clock.py): the flow holds still for the settle and
     close at the grasp (ARRIVE_S + GRIP_S) and for the hold and 1 cm/step rise after the release. Grasp and release
-    from the plan's thumb / index tips with the step 1.7 rule; a plan without both gets no pauses."""
+    from the plan's thumb / index tips with the retargeting rule (replay/retarget.py); a plan without both gets no pauses."""
     try:
         g, r = grasp_events(np.linalg.norm(pts[:, 1, :3] - pts[:, 2, :3], axis=1), pts[:, 1:3, :3].mean(1))
     except IndexError:

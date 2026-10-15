@@ -1,10 +1,6 @@
-"""Printable calibration targets (A4 PDFs, content also fits US Letter).
+"""Printable targets (A4 PDFs): table_marker.pdf (ArUco marker that defines the table frame) and charuco_board.pdf.
 
-- table_marker.pdf: ArUco marker that defines the table frame (taped to the table).
-- charuco_board.pdf: ChArUco board for camera calibration (taped to something flat).
-
-Print at 100% scale ("actual size", no fit-to-page), then measure the 100 mm scale bar with a
-ruler and set PRINT_SCALE below. Detection code uses the *_PRINTED sizes.
+Print at 100 % scale, measure the 100 mm scale bar and set PRINT_SCALE; detection uses the *_PRINTED sizes.
 """
 from pathlib import Path
 

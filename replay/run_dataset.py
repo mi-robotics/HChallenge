@@ -1,15 +1,9 @@
-"""Run the Phase 1 pipeline and the sim replay on every recorded episode, and count the successes.
+"""Real2sim for every recorded episode: hand tracking to sim replay, and the success count.
 
   python replay/run_dataset.py [data/mug_pnp_dataset]
 
-Per episode, the same stages as the 5 Phase 1 demos (step 1.4-1.9), without their per-step plots:
-  track_hand -> to_table -> clean -> retarget -> scene_match -> replay (all three rim-grasp constraints)
-A stage whose output file already exists is skipped, so a rerun picks up where it stopped. An episode that
-raises in a stage is recorded with that stage and the error, and the run goes on to the next episode.
-Each episode runs in its own process: with MediaPipe and MuJoCo's EGL renderer in one long-running process,
-scene_match segfaulted on episode 5 (the same episode runs fine on its own).
-
-Writes <dataset>/replay_summary.json (one row per episode: stage reached, error, the replay's numbers).
+Per episode: track_hand -> to_table -> clean -> retarget -> scene_match -> replay, each in its own process.
+Finished stages are skipped; errors are recorded and the run continues. Writes <dataset>/replay_summary.json.
 """
 import json
 import subprocess
@@ -71,7 +65,7 @@ if __name__ == "__main__":
             out = subprocess.run([sys.executable, __file__, "--episode", str(ep)], capture_output=True, text=True,
                                  timeout=TIMEOUT_S)
             rows.append(json.loads(out.stdout.strip().splitlines()[-1]))
-        except subprocess.TimeoutExpired:  # one MediaPipe run hung (2% CPU) in step 4.2
+        except subprocess.TimeoutExpired:  # a MediaPipe run can hang
             rows.append({"episode": ep.name, "stage": "crashed", "error": f"timeout after {TIMEOUT_S} s"})
         except (IndexError, json.JSONDecodeError):
             rows.append({"episode": ep.name, "stage": "crashed", "error": f"exit {out.returncode}: {out.stderr[-300:]}"})

@@ -1,33 +1,12 @@
-"""Track the flow's hand and mug points through each demo video with CoTracker3 (offline model), and flag occlusions.
+"""Track the flow's 6 hand and 8 mug points through each video with CoTracker3 (offline), and flag occlusions.
 
-  python flow/track_points.py [data/demos/<demo> ...]     (default: all demos)
+  python flow/track_points.py [<episode> ...]     (default: data/demos)
 
-Hand: the 6 hand points of flow/FORMAT.md, queried from the MediaPipe landmarks (step 1.4) every QUERY_EVERY frames
-where MediaPipe found the hand, each tracked forwards and backwards through the whole video. In each frame, a point
-comes from its query nearest in time. (With one query frame per demo, the pinky knuckle, hidden behind the hand in
-70-80% of frames in demos 2 and 4, drifted up to 287 px.)
-Check: pixel distance to the MediaPipe landmark in frames >= 4 from a query frame where MediaPipe found the hand.
-
-Mug: 8 points spread over the SAM 2 mug mask in the first frame (flow/mug_sam.py, run it first), tracked from there.
-(Before: 8 points on a cylinder placed from the hand, re-queried in the last frame; in demo 4 one started on the
-mug's lower edge and stayed on the table. Comparison: PROJECT_PLAN.md 3.4.)
-
-Occlusion. CoTracker's visibility says whether the surface at the tracked pixel is visible, not whether the point is:
-a query on a hidden pinky knuckle starts on whatever is in front of it. So a point is also occluded if the D405 depth
-at its pixel disagrees with where the point should be:
-  hand  expected position: MediaPipe's metric 3D hand shape (world landmarks) fitted to the D405 points of its 21
-        landmarks with a RANSAC similarity fit (rotation, translation, scale; inliers within 1.5 cm). Occluded if the
-        D405 sees something > IN_FRONT_M in front of it, > BEHIND_M behind it (the pixel is off the hand), or has
-        no depth there, or it is within EDGE_PX of the image border (demo 5: the hand leaves the image and the tracks
-        sit on the border). Frames without MediaPipe or with < 8 landmarks with depth: CoTracker's visibility and
-        the border check only.
-        (Using MediaPipe's z directly, without the fit, gave per-landmark biases of -6 to +5 cm: the wrist was
-        "occluded" in 92-100% of frames.)
-  mug   hidden unless CoTracker calls it visible and it lies inside that frame's SAM 2 mug mask (dilated by
-        MASK_TOL_PX): the mask leaves out the hand in front of the mug and anything off the mug.
-
-Writes cotracker.npz to each demo folder (uv [T, 6, 2], visible [T, 6], cup_uv [T, 8, 2], cup_visible [T, 8];
-visible = not occluded) and media/phase3/task2/tracks.mp4 (all demos tiled, with a legend).
+Hand points are queried from the MediaPipe landmarks every QUERY_EVERY frames; each frame uses its nearest query.
+Mug points are spread over the SAM 2 mug mask (run flow/mug_sam.py first) and tracked from the first frame.
+Occluded: CoTracker says so, or the D405 depth disagrees with where the point should be (MediaPipe's 3D hand
+fitted to the depth with RANSAC), or a mug point leaves the mug mask. Writes cotracker.npz (uv, visible, cup_uv,
+cup_visible).
 """
 import json
 import subprocess

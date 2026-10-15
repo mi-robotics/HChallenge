@@ -1,12 +1,8 @@
 """Hand landmarks (pixels + D405 depth) -> 3D points in the table (marker) frame.
 
-  python replay/to_table.py [data/demos/<demo> ...]     (default: all demos)
+  python replay/to_table.py [<episode> ...]     (default: data/demos)
 
-Writes hand_table.npz to each demo folder:
-  p      [T,21,3]  landmark positions in the table frame, metres (NaN where invalid)
-  valid  [T,21]    hand detected and depth valid
-  cam_in_table [3] camera position in the table frame
-and a top-down + height plot of all demos to media/phase1/task5/hand_table.png.
+Writes hand_table.npz: p [T, 21, 3] (m, NaN where invalid), valid [T, 21], cam_in_table [3].
 """
 import json
 import sys

@@ -1,9 +1,7 @@
-"""Intel RealSense D405: colour + aligned depth, a live viewer for aiming, and a table-frame check.
+"""Intel RealSense D405: colour + aligned depth, a live viewer, and a table-frame check.
 
-  python calibration/d405.py            live view; draws the table-marker axes when it is visible
-                                        keys: s = save snapshot to data/calibration/, q = quit
-  python calibration/d405.py check      1 s capture: marker detection rate, pose jitter, depth vs
-                                        marker plane; saves media/phase1/task2/table_frame.jpg
+  python calibration/d405.py          live view with the table-marker axes; s = save snapshot, q = quit
+  python calibration/d405.py check    1 s capture: marker detection rate, pose jitter, depth vs marker plane
 """
 import time
 from pathlib import Path

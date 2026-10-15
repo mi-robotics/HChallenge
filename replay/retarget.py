@@ -1,21 +1,10 @@
 """Map the cleaned hand trajectory to robot commands.
 
-  python replay/retarget.py [data/demos/<demo> ...]     (default: all demos)
+  python replay/retarget.py [<episode> ...]     (default: data/demos)
 
-- Position: the pinch point (midpoint of thumb and index tips) drives the gripper's fingertip centre,
-  relative to where the grasp happened. At replay time it is anchored at the sim rim-grasp point:
-      target(t) = pinch(t) - pinch(t_grasp) + sim_grasp_point
-  so the real mug (~9 cm) and sim mug (13.5 cm) heights cancel. No rotation or scale: the table
-  frame's axes map onto the sim's (x away from the camera = away from the robot base).
-- Gripper: one grasp per demo. Close at the first thumb-index distance < 2.5 cm; release at the first
-  distance > 3.0 cm after the pinch has risen 3 cm above the grasp point (so a flicker while closing
-  on the cup, or the hand relaxing after release, is ignored).
-
-Writes retarget.npz to each demo folder:
-  t [N], rel [N,3] pinch relative to the grasp point (m), gripper [N] (-1 open, +1 close),
-  i_grasp, i_release, real_grasp [3], real_release [3] (table frame, m)
-and media/phase1/task7/retarget.png. Also renders pinch_overlay.mp4 per demo (cleaned pinch point projected
-into the camera image, gripper state) and tiles them into media/phase1/task7/pinch.mp4.
+Position: the pinch point (thumb / index midpoint) relative to the grasp; at replay it is anchored at the sim
+rim-grasp point. Gripper: close at the first thumb-index distance < 2.5 cm, open at the first > 3 cm after the pinch
+has risen 3 cm. Writes retarget.npz (t, rel, gripper, grasp / release indices and points).
 """
 import json
 import subprocess

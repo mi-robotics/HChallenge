@@ -1,13 +1,9 @@
 """Record demos with the D405.
 
-  python replay/record.py [out_dir]     (default: data/demos; Phase 4 episodes: data/mug_pnp_dataset)
-      s = start recording, e = end recording (saves one demo), x = discard the current recording, q = quit
+  python replay/record.py [out_dir]     (default: data/demos)
+      s = start, e = end (saves the demo), x = discard, q = quit
 
-Each demo is saved to <out_dir>/<YYYYmmdd_HHMMSS>/:
-  color.mp4     H.264, near-lossless (crf 12), 30 fps
-  depth.mkv     raw uint16 depth aligned to colour, lossless (FFV1); x depth_scale = metres
-  frames.csv    frame index, camera frame number, camera timestamp (ms)
-  meta.json     intrinsics, depth_scale, instruction, frame count, dropped frames
+Each demo goes to <out_dir>/<YYYYmmdd_HHMMSS>/: color.mp4, depth.mkv (lossless uint16), frames.csv, meta.json.
 """
 import json
 import shutil
