@@ -29,6 +29,8 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "replay"))
 sys.path.insert(0, str(ROOT / "flow"))
 sys.path.insert(0, str(ROOT / "sim"))
+sys.path.append(str(ROOT))
+from dataset import Episode  # noqa: E402
 from replay import HZ, make_env, replay  # noqa: E402
 
 IMG = 256  # env camera size: both views are saved at this size
@@ -46,7 +48,7 @@ def project_third_person(pts, size=IMG):
 def render(episodes, out_path, cell=256, flow=False):
     if flow:
         import json
-        from format import T
+        from format import HAND_POINTS, N_CUP_POINTS, T
         from sim_clock import SIM_HZ
         from to_table import demo_marker_pose
         from track_points import HAND_COLOUR, YELLOW
@@ -64,15 +66,14 @@ def render(episodes, out_path, cell=256, flow=False):
                 break
             real.append(cv2.resize(f, (cell * 16 // 9 // 2 * 2, cell)))  # even width for H.264
         if flow:
-            fl = np.load(ep / "flow_sim.npz")
-            pts = np.concatenate([fl["hand"], fl["cup"]])  # [14, N_sim, 4], table frame, one row per sim step
+            pts = Episode(ep).flow.transpose(1, 0, 2)  # [14, N_sim, 4], table frame, one row per sim step
             uv = project_third_person(pts[..., :3] + sim["sim_minus_real"]) * cell / IMG
             meta = json.loads((ep / "meta.json").read_text())
             K, dist = np.array(meta["camera_matrix"]), np.array(meta["dist_coeffs"])
             R, tv, _ = demo_marker_pose(ep, K, dist)
             uv_real = cv2.projectPoints(pts[..., :3].reshape(-1, 3).astype(np.float64), cv2.Rodrigues(R)[0], tv, K,
                                         dist)[0].reshape(*pts.shape[:2], 2) * cell / meta["image_size"][1]
-            colours, n_hand, N = HAND_COLOUR + [YELLOW] * len(fl["cup"]), len(fl["hand"]), pts.shape[1]
+            colours, n_hand, N = HAND_COLOUR + [YELLOW] * N_CUP_POINTS, len(HAND_POINTS), pts.shape[1]
         frames = []
         for i in range(len(sim["action"])):
             r = real[min(int(np.searchsorted(t_cam, sim["t_real"][i])), len(real) - 1)].copy()

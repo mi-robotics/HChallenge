@@ -8,37 +8,23 @@ A sample at step i:
                              x y z in the table frame (metres) + visible (0/1)
 Rows past the end repeat the last one, as in the policy (FORMAT.md).
 """
-import json
+import sys
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
-import cv2
 import numpy as np
 
-ROOT = Path(__file__).resolve().parents[1]
+sys.path.append(str(Path(__file__).resolve().parents[1]))
+from dataset import Episode, episode_dirs, read_video  # noqa: E402
+
 H, W = 256, 448  # 1280 x 720 resized; both divisible by 16 (VAE 8x, patch 2x)
 FLOW_STEPS, STRIDE = 16, 2
 N_FRAMES = 1 + FLOW_STEPS  # now + 16 future frames
 PROMPT = "pick up the mug and put it on the plate"
 
 
-def episode_dirs(split):
-    names = json.loads((ROOT / "data" / "splits.json").read_text())[split]
-    return [ROOT / "data" / "mug_pnp_dataset" / n for n in names]
-
-
-def read_frames(path, size=(W, H), first=False):
-    cap, out = cv2.VideoCapture(str(path)), []
-    while True:
-        ok, img = cap.read()
-        if not ok or (first and out):
-            return np.stack(out)
-        out.append(cv2.resize(img, size, interpolation=cv2.INTER_AREA)[..., ::-1])  # RGB
-
-
-def read_flow(ep):
-    f = np.load(ep / "flow_sim.npz")
-    return np.concatenate([f["hand"], f["cup"]]).transpose(1, 0, 2).astype(np.float32)  # [N, 14, 4]
+def read_frames(path, first=False):
+    return read_video(path, (W, H), first)
 
 
 class Episodes:
@@ -48,7 +34,7 @@ class Episodes:
         self.dirs = episode_dirs(split)[:limit]
         with ThreadPoolExecutor(16) as pool:
             self.frames = list(pool.map(lambda d: read_frames(d / "video_sim.mp4"), self.dirs))
-        self.flow = [read_flow(d) for d in self.dirs]
+        self.flow = [Episode(d).flow for d in self.dirs]
         for d, v, f in zip(self.dirs, self.frames, self.flow):
             assert len(v) == len(f), (d, len(v), len(f))
         self.steps = [(e, i) for e, f in enumerate(self.flow) for i in range(len(f))]

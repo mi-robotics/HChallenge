@@ -72,9 +72,10 @@ def write_panels(ep, plan, sim_frames, path, src=None, title=""):
     the end). src: plan step per sim step when pauses were inserted into the plan (the generated video pauses with it)."""
     from PIL import Image, ImageDraw
     sys.path.insert(0, str(ROOT / "wam"))
-    from data import H, read_flow, read_frames
+    from data import H, read_frames
+    from dataset import Episode
     cam = camera(ep)
-    real, real_flow = read_frames(ep / "video_sim.mp4"), read_flow(ep)
+    real, real_flow = read_frames(ep / "video_sim.mp4"), Episode(ep).flow
     gen, gen_flow = read_frames(plan / "plans" / f"{ep.name}.mp4"), np.load(plan / "plans" / f"{ep.name}.npz")["flow"]
     bars, font = title_bars(title, sum(w for _, w in PANELS))
     out = []

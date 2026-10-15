@@ -40,8 +40,10 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "policy"))
 sys.path.insert(0, str(ROOT / "replay"))
 sys.path.insert(0, str(ROOT / "sim"))
+sys.path.append(str(ROOT))
 from s1_model import S1Config, S1Model  # noqa: E402
-from train_s1 import FLOW_POINTS, episode_dirs, flow_features  # noqa: E402
+from dataset import Episode, episode_dirs  # noqa: E402
+from train_s1 import FLOW_POINTS, flow_features  # noqa: E402
 from replay import ARRIVE_S, GRIP_S, HZ, LIFT_M, OPEN_HOLD_S, snapshot  # noqa: E402
 from retarget import grasp_events  # noqa: E402
 from scene import OPEN, make_env, move_to, place, reset, set_camera, set_third_person_camera  # noqa: E402
@@ -84,8 +86,7 @@ def run_episode(env, ep, model, norm, ck, execute, denoise, dev, frames=None, pl
     sim = np.load(ep / "sim.npz")
     pinch, eef = pinch_sim(ep, sim), []
     if ck.get("flow"):
-        fl = np.load(ep / "flow_sim.npz")
-        pts = np.concatenate([fl["hand"], fl["cup"]]).transpose(1, 0, 2)
+        pts = Episode(ep).flow
         if plan is not None:
             pts = np.repeat(np.load(plan / "plans" / f"{ep.name}.npz")["flow"], 2, axis=0)  # 10 Hz -> sim steps
             if pauses:

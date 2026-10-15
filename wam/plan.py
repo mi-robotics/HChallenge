@@ -19,12 +19,11 @@ import torch
 from peft.tuners.lora import LoraLayer
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "policy"))
-from data import FLOW_STEPS, STRIDE, read_flow, read_frames  # noqa: E402
+from data import FLOW_STEPS, STRIDE, read_frames  # noqa: E402
+from dataset import Episode, episode_dirs  # noqa: E402
 from model import Layout, load_transformer, load_vae  # noqa: E402
 from render import write_mp4  # noqa: E402
 from train import add_lora, prompt_embedding, rollout  # noqa: E402
-from train_s1 import episode_dirs  # noqa: E402
 
 HZ, EXTRA_S = 20, 3  # as policy/eval_s1.py
 
@@ -68,7 +67,7 @@ def main():
         batch = eps[k:k + args.batch]
         chunks = -(-max(horizon[ep] for ep in batch) // (STRIDE * FLOW_STEPS))
         frame0 = np.stack([read_frames(ep / "video_sim.mp4", first=True)[0] for ep in batch])
-        state0 = np.stack([read_flow(ep)[0] for ep in batch]) if args.given_state else None
+        state0 = np.stack([Episode(ep).flow[0] for ep in batch]) if args.given_state else None
         with torch.autocast("cuda", torch.bfloat16):
             frames, flow = rollout(model, vae, frame0, text, cfg["flow_stats"], layout, chunks,
                                    dict(steps=args.steps, sigma_min=args.sigma_min), state0)

@@ -35,40 +35,29 @@ import torch
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "policy"))
+sys.path.append(str(ROOT))
+from dataset import ACTION_DIMS, STATE_KEYS, Episode, episode_dirs  # noqa: E402
 from s1_model import S1Config, S1Model  # noqa: E402
 
 CAMERAS = ("agentview", "eye_in_hand")
 FLOW_POINTS = {"hand": 6, "full": 14}  # flow points: hand 0-5, then mug 6-13
-STATE_KEYS = ("eef_pos", "eef_quat", "gripper_qpos")
-ACTION_DIMS = [0, 1, 2, 6]
-
-
-def episode_dirs(split):
-    names = json.loads((ROOT / "data" / "splits.json").read_text())[split]
-    folder = "mug_pnp_failed" if split.startswith("failed") else "mug_pnp_dataset"
-    return [ROOT / "data" / folder / n for n in names]
-
-
-def state_of(sim):
-    return np.concatenate([np.asarray(sim[k], np.float32).reshape(len(sim["action"]), -1) for k in STATE_KEYS], 1)
-
 
 def load(split, device, cameras=CAMERAS):
     """All steps of a split: images per camera [N, 256, 256, 3] uint8, state [N, 9], action [N, 4], episode end [N],
     flow points (hand, then mug) [N, 14, 4] (table frame), sim_minus_real [N, 3]."""
     imgs, state, action, end, pts, smr = {c: [] for c in cameras}, [], [], [], [], []
     n = 0
-    for ep in episode_dirs(split):
-        sim, fl = np.load(ep / "sim.npz"), np.load(ep / "flow_sim.npz")
-        assert fl["hand"].shape[1] == len(sim["action"]), ep
+    for ep in map(Episode, episode_dirs(split)):
+        steps = len(ep.action)
+        assert len(ep.flow) == steps, ep.path
         for c in cameras:
-            imgs[c].append(torch.from_numpy(sim[c]).to(device))
-        state.append(state_of(sim))
-        action.append(sim["action"][:, ACTION_DIMS])
-        pts.append(np.concatenate([fl["hand"], fl["cup"]]).transpose(1, 0, 2))
-        smr.append(np.tile(sim["sim_minus_real"].astype(np.float32), (len(sim["action"]), 1)))
-        n += len(sim["action"])
-        end.append(np.full(len(sim["action"]), n))
+            imgs[c].append(torch.from_numpy(ep.sim[c]).to(device))
+        state.append(ep.state)
+        action.append(ep.action)
+        pts.append(ep.flow)
+        smr.append(np.tile(ep.sim_minus_real.astype(np.float32), (steps, 1)))
+        n += steps
+        end.append(np.full(steps, n))
     return ({c: torch.cat(v) for c, v in imgs.items()},
             *(torch.from_numpy(np.concatenate(v)).to(device) for v in (state, action, end, pts, smr)))
 
