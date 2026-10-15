@@ -1,14 +1,17 @@
 /* Shared style for the project site. Same tokens and fonts as the step reports (docs/steps). */
 :root {
   --node: #ffffff; --node-alt: #eef1fb; --train: #2d4fd0; --test: #d98a00; --failed: #8a919d; --notusable: #c3c8d0;
+  --img: #dae8fc; --img-l: #6c8ebf; --flw: #fff2cc; --flw-l: #d6b656; --prp: #e1d5e7; --prp-l: #9673a6; --act: #f8cecc; --act-l: #b85450; --net: #d5e8d4; --net-l: #82b366; --big: #6c8ebf;
   --bg: #f5f6f8; --surface: #ffffff; --fg: #1a1e26; --muted: #5d6573; --line: #dde1e8; --accent: #2d4fd0;
   --display: "Archivo", "Helvetica Neue", Arial, sans-serif;
   --mono: "JetBrains Mono", ui-monospace, Menlo, monospace;
 }
 @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
   --bg: #12151b; --surface: #1a1e26; --fg: #e6e9ef; --muted: #98a0ae; --line: #2c323d; --accent: #8aa2ff; --node: #1a1e26; --node-alt: #1e2540; --train: #8aa2ff; --test: #f2b33d; --failed: #8a919d; --notusable: #4a515d; color-scheme: dark } }
+  --img: #1f2b40; --img-l: #6c8ebf; --flw: #3a3320; --flw-l: #d6b656; --prp: #33283a; --prp-l: #a988ba; --act: #3d2323; --act-l: #c96a66; --net: #1f3320; --net-l: #82b366; --big: #8aa2ff;
 :root[data-theme="dark"] {
   --bg: #12151b; --surface: #1a1e26; --fg: #e6e9ef; --muted: #98a0ae; --line: #2c323d; --accent: #8aa2ff; --node: #1a1e26; --node-alt: #1e2540; --train: #8aa2ff; --test: #f2b33d; --failed: #8a919d; --notusable: #4a515d; color-scheme: dark }
+  --img: #1f2b40; --img-l: #6c8ebf; --flw: #3a3320; --flw-l: #d6b656; --prp: #33283a; --prp-l: #a988ba; --act: #3d2323; --act-l: #c96a66; --net: #1f3320; --net-l: #82b366; --big: #8aa2ff;
 
 * { box-sizing: border-box; }
 body { margin: 0; background: var(--bg); color: var(--fg); font: 16px/1.6 var(--display); }
@@ -54,6 +57,20 @@ section { scroll-margin-top: 16px; }
 .diagram .b { font: 500 11px var(--mono); letter-spacing: .08em; fill: var(--accent); }
 .diagram .edge { fill: none; stroke: var(--muted); stroke-width: 1.4; }
 .diagram .ah { fill: var(--muted); }
+.arch svg { max-width: 60rem; }
+.arch rect, .arch circle { stroke-width: 1.2; }
+.arch .frame { fill: var(--node); stroke: var(--fg); }
+.arch .c-img { fill: var(--img); stroke: var(--img-l); }
+.arch .c-flow { fill: var(--flw); stroke: var(--flw-l); }
+.arch .c-prop { fill: var(--prp); stroke: var(--prp-l); }
+.arch .c-act { fill: var(--act); stroke: var(--act-l); }
+.arch .c-net { fill: var(--net); stroke: var(--net-l); }
+.arch .s { fill: var(--fg); }
+.arch .dash { stroke: var(--fg); stroke-width: 1; stroke-dasharray: 3 3; }
+.arch .dashedge { fill: none; stroke: var(--fg); stroke-width: 1.3; stroke-dasharray: 7 5; }
+.arch .big { fill: var(--big); }
+.arch .plus circle { fill: var(--node); stroke: var(--fg); }
+.arch .plus path { stroke: var(--fg); stroke-width: 1.4; }
 
 .photo { margin: 0; display: grid; gap: 8px; max-width: 36rem; }
 .photo img { display: block; width: 100%; max-width: 36rem; border-radius: 6px; border: 1px solid var(--line); background: var(--surface); }

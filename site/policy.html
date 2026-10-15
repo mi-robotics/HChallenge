@@ -23,13 +23,32 @@
 </header>
 
 <main>
-  <header>
-    <h1>Flow → action policy in sim</h1>
-  </header>
+  <nav class="toc" aria-label="On this page">
+    <h2>Contents</h2>
+    <ol>
+      <li><a href="#overview">Overview</a></li>
+      <li><a href="#results">Results</a></li>
+      <li><a href="#visualizations">Visualizations</a></li>
+      <li><a href="#third-party-dependencies">Third-party dependencies</a></li>
+      <li><a href="#limitations">Limitations</a></li>
+    </ol>
+  </nav>
 
-  <section id="model">
-    <h2>Model</h2>
-    <p class="todo">Content to come.</p>
+  <section id="overview">
+    <h2>Overview</h2>
+    <p>The policy is trained for 20k steps with a batch size of 64 on one RTX 5090 (29 min). Everything is trained from
+    scratch except the DINOv2 image encoder, which starts from its pretrained weights and is fine-tuned. The policy is
+    conditioned on the wrist camera, the action flow and the robot state, and generates the next 32 action steps
+    (1.6 s at 20 Hz).</p>
+    <figure class="diagram arch">
+      <div class="scroll">
+        <svg viewBox="0 0 992 520" role="img" aria-labelledby="arch-title">
+        <title id="arch-title">Policy architecture: the wrist image (DINOv2), action flow and robot state become tokens for the obs encoder; the action denoiser turns 32 noised actions into 32 output actions, cross-attending to the encoder output</title>
+        <defs><marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" class="ah"/></marker></defs>
+        <rect class="frame" x="30" y="20" width="130" height="64" rx="8"/><text class="t" x="95.0" y="48.0" style="text-anchor:middle">Wrist camera</text><text class="s" x="95.0" y="65.0" style="text-anchor:middle">224 × 224 RGB</text><path class="edge" d="M95 84 L95 118" marker-end="url(#ah)"/><rect class="c-img" x="10" y="120" width="170" height="60" rx="8"/><text class="t" x="95.0" y="146.0" style="text-anchor:middle">DINOv2 ViT-S/14</text><text class="s" x="95.0" y="163.0" style="text-anchor:middle">fine-tuned</text><path class="edge" d="M95 180 L95 220" marker-end="url(#ah)"/><rect class="c-img" x="10" y="222" width="24" height="24" rx="2"/><rect class="c-img" x="156" y="222" width="24" height="24" rx="2"/><path class="dash" d="M34 234 L156 234"/><text class="s" x="95" y="268" style="text-anchor:middle">256 patch tokens</text><circle class="c-flow" cx="222" cy="58" r="17"/><circle class="c-flow" cx="338" cy="58" r="17"/><path class="dash" d="M239 58 L321 58"/><text class="t" x="280" y="16" style="text-anchor:middle">Action flow</text><text class="s" x="280" y="32" style="text-anchor:middle">16 steps × 14 points</text><path class="edge" d="M280 58 L280 118" marker-end="url(#ah)"/><rect class="c-flow" x="215" y="120" width="130" height="60" rx="8"/><text class="t" x="280.0" y="154.0" style="text-anchor:middle">Linear</text><path class="edge" d="M280 180 L280 190"/><g class="plus"><circle cx="280" cy="198" r="8"/><path d="M275.5 198 L284.5 198 M280 193.5 L280 202.5"/></g><path class="edge" d="M280 206 L280 220" marker-end="url(#ah)"/><rect class="c-flow" x="215" y="222" width="24" height="24" rx="2"/><rect class="c-flow" x="321" y="222" width="24" height="24" rx="2"/><path class="dash" d="M239 234 L321 234"/><text class="s" x="280" y="268" style="text-anchor:middle">16 flow tokens</text><circle class="c-prop" cx="410" cy="58" r="17"/><text class="t" x="410" y="16" style="text-anchor:middle">Robot state</text><text class="s" x="410" y="32" style="text-anchor:middle">9 values</text><path class="edge" d="M410 75 L410 118" marker-end="url(#ah)"/><rect class="c-prop" x="375" y="120" width="70" height="60" rx="8"/><text class="t" x="410.0" y="154.0" style="text-anchor:middle">Linear</text><path class="edge" d="M410 180 L410 190"/><g class="plus"><circle cx="410" cy="198" r="8"/><path d="M405.5 198 L414.5 198 M410 193.5 L410 202.5"/></g><path class="edge" d="M410 206 L410 220" marker-end="url(#ah)"/><rect class="c-prop" x="398" y="222" width="24" height="24" rx="2"/><text class="s" x="410" y="268" style="text-anchor:middle">1 state token</text><text class="s" x="456" y="202" style="text-anchor:start">learned position</text><text class="s" x="456" y="217" style="text-anchor:start">embedding</text><path class="edge" d="M10 278 Q10 288 20 288 L217 288 Q227 288 227 298 Q227 288 237 288 L435 288 Q445 288 445 278"/><path class="edge" d="M227 298 L227 324" marker-end="url(#ah)"/><rect class="c-net" x="10" y="326" width="435" height="96" rx="8"/><text class="t" x="227.5" y="362.0" style="text-anchor:middle">Obs encoder</text><text class="s" x="227.5" y="379.0" style="text-anchor:middle">273 tokens × 768</text><text class="s" x="227.5" y="395.0" style="text-anchor:middle">4 transformer layers, 8 heads</text><path class="big" d="M445 366 L588 366 L588 354 L604 374 L588 394 L588 382 L445 382 Z"/><text class="s" x="524" y="330" style="text-anchor:middle">final encoder output</text><text class="s" x="524" y="345" style="text-anchor:middle">(273 tokens)</text><text class="s" x="524" y="412" style="text-anchor:middle">cross-attended by</text><text class="s" x="524" y="427" style="text-anchor:middle">all 6 decoder layers</text><g transform="translate(32 0)"><circle class="c-act" cx="600" cy="58" r="17"/><circle class="c-act" cx="780" cy="58" r="17"/><path class="dash" d="M617 58 L763 58"/><text class="t" x="690" y="16" style="text-anchor:middle">32 noised actions</text><text class="s" x="690" y="32" style="text-anchor:middle">dx, dy, dz, gripper</text><path class="edge" d="M690 58 L690 118" marker-end="url(#ah)"/><rect class="c-act" x="650" y="120" width="80" height="60" rx="8"/><text class="t" x="690.0" y="154.0" style="text-anchor:middle">Linear</text><path class="edge" d="M690 180 L690 190"/><g class="plus"><circle cx="690" cy="198" r="8"/><path d="M685.5 198 L694.5 198 M690 193.5 L690 202.5"/></g><path class="edge" d="M690 206 L690 220" marker-end="url(#ah)"/><text class="s" x="678" y="196" style="text-anchor:end">time t +</text><text class="s" x="678" y="211" style="text-anchor:end">position emb.</text><rect class="c-act" x="578" y="222" width="24" height="24" rx="2"/><rect class="c-act" x="778" y="222" width="24" height="24" rx="2"/><path class="dash" d="M602 234 L778 234"/><text class="s" x="690" y="268" style="text-anchor:middle">32 action tokens</text><path class="edge" d="M690 276 L690 324" marker-end="url(#ah)"/><rect class="c-net" x="578" y="326" width="224" height="96" rx="8"/><text class="t" x="690.0" y="370.0" style="text-anchor:middle">Action denoiser</text><text class="s" x="690.0" y="387.0" style="text-anchor:middle">6 transformer decoder layers</text><path class="dashedge" d="M802 374 L838 374 L838 58 L799 58" marker-end="url(#ah)"/><text class="s" x="900" y="200" style="text-anchor:middle">10 Euler steps</text><text class="s" x="900" y="215" style="text-anchor:middle">at inference,</text><text class="s" x="900" y="230" style="text-anchor:middle">t = 1 → 0</text><path class="edge" d="M690 422 L690 446" marker-end="url(#ah)"/><rect class="c-act" x="578" y="448" width="24" height="24" rx="2"/><rect class="c-act" x="778" y="448" width="24" height="24" rx="2"/><path class="dash" d="M602 460 L778 460"/><text class="s" x="690" y="492" style="text-anchor:middle">32 actions = 1.6 s at 20 Hz;</text><text class="s" x="690" y="508" style="text-anchor:middle">the first 10 are run, then re-plan</text></g>
+        </svg>
+      </div>
+    </figure>
   </section>
 
   <section id="results">
@@ -37,13 +56,18 @@
     <p class="todo">Content to come.</p>
   </section>
 
-  <section id="ablations">
-    <h2>Ablations</h2>
+  <section id="visualizations">
+    <h2>Visualizations</h2>
     <p class="todo">Content to come.</p>
   </section>
 
-  <section id="videos">
-    <h2>Videos</h2>
+  <section id="third-party-dependencies">
+    <h2>Third-party dependencies</h2>
+    <p class="todo">Content to come.</p>
+  </section>
+
+  <section id="limitations">
+    <h2>Limitations</h2>
     <p class="todo">Content to come.</p>
   </section>
 </main>
