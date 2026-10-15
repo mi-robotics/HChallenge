@@ -10,7 +10,7 @@ Check: pixel distance to the MediaPipe landmark in frames >= 4 from a query fram
 
 Mug: 8 points spread over the SAM 2 mug mask in the first frame (flow/mug_sam.py, run it first), tracked from there.
 (Before: 8 points on a cylinder placed from the hand, re-queried in the last frame; in demo 4 one started on the
-mug's lower edge and stayed on the table. Comparison: flow/mug_compare.py.)
+mug's lower edge and stayed on the table. Comparison: PROJECT_PLAN.md 3.4.)
 
 Occlusion. CoTracker's visibility says whether the surface at the tracked pixel is visible, not whether the point is:
 a query on a hidden pinky knuckle starts on whatever is in front of it. So a point is also occluded if the D405 depth

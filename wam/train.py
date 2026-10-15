@@ -272,7 +272,7 @@ def main():
             log, t0 = [], time.time()
         if step % args.sample_every == 0 or step == args.steps:
             lora = {k: v for k, v in model.state_dict().items() if "lora" in k}
-            torch.save(lora, out / "lora_latest.pt")  # overwritten each time (370 MB); wam/sample.py can re-sample it
+            torch.save(lora, out / "lora_latest.pt")  # overwritten each time (370 MB)
             evaluate(model, vae, text, stats, vs, out, step, args.chunks, layout)
             t0 = time.time()
         if step % args.save_every == 0 or step == args.steps:

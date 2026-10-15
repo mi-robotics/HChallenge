@@ -35,7 +35,7 @@ Hand, in this order (MediaPipe landmark index in brackets):
 | 4 | middle knuckle [9] | |
 | 5 | pinky knuckle [17] | |
 
-Cup: 8 points spread over the SAM 2 mug mask in the first frame (`flow/mug_sam.py`, farthest-point sampling; steps 3.2, 3.4). Image position: CoTracker; hidden when outside that frame's mug mask. Depth: the D405 has none on the white mug, so it comes from where the point's camera ray meets a 4 cm-radius cylinder that moves with the tracked pinch point, capped at the rim (`flow/to_flow.py`; checked against PnP in `flow/mug_check.py`).
+Cup: 8 points spread over the SAM 2 mug mask in the first frame (`flow/mug_sam.py`, farthest-point sampling; steps 3.2, 3.4). Image position: CoTracker; hidden when outside that frame's mug mask. Depth: the D405 has none on the white mug, so it comes from where the point's camera ray meets a 4 cm-radius cylinder that moves with the tracked pinch point, capped at the rim (`flow/to_flow.py`; checked against PnP, PROJECT_PLAN.md 3.4).
 
 ## One episode
 

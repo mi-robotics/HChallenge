@@ -9,7 +9,7 @@ the SAM 2 mask since step 4.4, flow/format.py hold_times; flow/format.py cup_cyl
 the D405 has no depth on the white mug). Rays that miss the cylinder (e.g. on the handle) take the point of closest
 approach to its axis; rays that would meet it above the rim (mask points inside the mug, seen through the opening)
 take the point where they cross the rim plane. So the mug's image position comes from tracking and only its distance from the camera from the
-hand. (Depth from PnP on the tracked mug points drifts during the carry: flow/mug_check.py.)
+hand. (Depth from PnP on the tracked mug points drifts during the carry, PROJECT_PLAN.md 3.4.)
 Then sampled at 10 Hz: each step is the mean of the visible camera frames within +-50 ms (about 3 frames; taking
 only the nearest frame left about twice the frame-to-frame jitter of the smoothed step 1.6 path). visible = the step
 3.2 occlusion check (any visible frame in the window). Hidden hand points: linear interpolation. Hidden mug points

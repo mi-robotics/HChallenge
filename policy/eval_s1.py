@@ -20,7 +20,7 @@ Writes <ckpt dir>/eval_<ckpt name>.json (eval_<ckpt name>_x<attempts>.json for -
 episodes, seed 0.
 --plan DIR (end-to-end test, step 6.3): the flow comes from the WAM's plan DIR/plans/<episode>.npz (wam/plan.py,
 10 Hz rows, row j = sim step 2 j; the policy is only queried at even steps) instead of the recorded flow; writes
-DIR/eval_<policy run>.json, and --video writes DIR/videos/<episode>.mp4 for the first --video-episodes test episodes:
+DIR/eval_<policy run>[_pauses][_<splits>][_<n>seeds].json, and --label writes DIR/videos/<episode>.mp4 for the first --video-episodes test episodes:
 real video + recorded flow | generated video + planned flow | robot wrist camera | robot third-person camera
 (wam/render.py).
 --pauses (with --plan): insert the replay's pauses into the plan (add_pauses), DIR/eval_<policy run>_pauses.json and
@@ -173,7 +173,7 @@ def main():
     ap.add_argument("--video-episodes", type=int, default=10)
     ap.add_argument("--plan", type=Path)
     ap.add_argument("--pauses", action="store_true")
-    ap.add_argument("--label", default="", help="--plan: title of the videos")
+    ap.add_argument("--label", default="", help="--plan: title of the videos (no videos without it)")
     args = ap.parse_args()
     tag = "_pauses" if args.pauses else ""
     video_dir = args.plan / f"videos{tag}" if args.plan else args.ckpt.parent / "eval_video_frames"
@@ -186,7 +186,7 @@ def main():
         for seed in args.seeds:
             for attempt in range(args.attempts):
                 for k, ep in enumerate(episode_dirs(split)):
-                    jobs.put((split, seed, attempt, k, str(ep), bool(args.video or args.plan) and split == "test"
+                    jobs.put((split, seed, attempt, k, str(ep), bool(args.video or args.label) and split == "test"
                               and seed == args.seeds[0] and attempt == 0 and k < args.video_episodes))
                     n += 1
     for _ in range(args.workers):
@@ -219,7 +219,9 @@ def main():
     ck = torch.load(args.ckpt, map_location="cpu", weights_only=False)
     out = args.ckpt.parent / f"eval_{args.ckpt.stem}{f'_x{args.attempts}' if args.attempts > 1 else ''}.json"
     if args.plan:
-        out = args.plan / f"eval_{args.ckpt.parent.name}{tag}.json"
+        splits = "" if args.splits == ap.get_default("splits") else "_" + "-".join(args.splits)
+        seeds = "" if args.seeds == [0] else f"_{len(args.seeds)}seeds"
+        out = args.plan / f"eval_{args.ckpt.parent.name}{tag}{splits}{seeds}.json"
     out.write_text(json.dumps({"ckpt": str(args.ckpt), "step": ck["step"], "execute": args.execute,
                                "denoise": args.denoise, "plan": str(args.plan), "pauses": args.pauses, "seeds": args.seeds, "attempts": args.attempts,
                                "summary": summary, "per_episode": per,
