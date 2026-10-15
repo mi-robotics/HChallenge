@@ -40,6 +40,14 @@
     scratch except the DINOv2 image encoder, which starts from its pretrained weights and is fine-tuned. The policy is
     conditioned on the wrist camera, the action flow and the robot state, and generates the next 32 action steps
     (1.6 s at 20 Hz).</p>
+    <ul class="points">
+      <li><strong>Robot state</strong> (9 values): gripper position x, y, z in the sim world; gripper orientation as a
+      quaternion (4, near constant, gripper pointing down); finger positions (2), how far each of the two fingers has
+      slid out from the centre, 0 (closed) to 4 cm (fully open).</li>
+      <li><strong>Action</strong> (4 values per step): gripper move dx, dy, dz in [−1, 1], where 1 asks the arm
+      controller for 5 cm in one 20 Hz step; gripper command −1 (open) or +1 (close). The orientation is never
+      changed.</li>
+    </ul>
     <figure class="diagram arch">
       <div class="scroll">
         <svg viewBox="0 0 992 520" role="img" aria-labelledby="arch-title">
@@ -53,7 +61,68 @@
 
   <section id="results">
     <h2>Results</h2>
-    <p class="todo">Content to come.</p>
+    <ul class="points">
+      <li>All policies are trained for 20k steps (batch 64).</li>
+      <li>At evaluation the policy predicts 32 actions, the first 10 are run, then it predicts again.</li>
+      <li>Each episode is run 5 times for each of 5 seeds (25 runs). Tables show the success rate (%), mean ± std
+      over the 5 seeds.</li>
+      <li>Flow-conditioned evals use the ground truth action flow from each episode's data, aligned to the sim's clock.</li>
+    </ul>
+    <h3 class="sub">Key comparison</h3>
+      <div class="scroll">
+      <table class="stats results">
+        <thead><tr><th>type</th><th>robot<br>state</th><th>wrist<br>camera</th><th>front<br>camera</th><th>object<br>flow</th>
+        <th>hand<br>flow</th><th>image<br>aug</th><th>encoder<br>pos. emb.</th><th class="num">train<br>(80)</th><th class="num">test<br>(20)</th><th class="num">failed<br>(46)</th></tr></thead>
+        <tbody>
+        <tr><th scope="row">baseline</th><td>✓</td><td>✓</td><td>✓</td><td>–</td><td>–</td><td>✓</td><td>none</td><td class="num">84.4 ± 1.6</td><td class="num"><strong>77.8 ± 1.7</strong></td><td class="num"><strong>42.1 ± 1.6</strong></td></tr>
+        <tr><th scope="row">baseline</th><td>✓</td><td>✓</td><td>–</td><td>–</td><td>–</td><td>✓</td><td>all</td><td class="num">59.1 ± 1.2</td><td class="num">36.6 ± 2.9</td><td class="num">24.9 ± 1.7</td></tr>
+        <tr><th scope="row">flow-conditioned</th><td>✓</td><td>✓</td><td>–</td><td>–</td><td>✓</td><td>✓</td><td>all</td><td class="num">91.3 ± 1.2</td><td class="num">72.0 ± 0.0</td><td class="num">7.8 ± 1.2</td></tr>
+        <tr class="pick"><th scope="row">flow-conditioned</th><td>✓</td><td>✓</td><td>–</td><td>✓</td><td>✓</td><td>✓</td><td>all</td><td class="num">92.3 ± 1.0</td><td class="num">76.6 ± 1.4</td><td class="num">7.0 ± 1.4</td></tr>
+        <tr><th scope="row">flow-conditioned</th><td>✓</td><td>✓</td><td>–</td><td>✓</td><td>✓</td><td>✓</td><td>state, flow</td><td class="num"><strong>93.5 ± 0.4</strong></td><td class="num">73.0 ± 1.8</td><td class="num">6.8 ± 0.4</td></tr>
+        </tbody>
+      </table>
+      </div>
+    <h3 class="sub">All runs</h3>
+      <div class="scroll">
+      <table class="stats results">
+        <thead><tr><th>type</th><th>robot<br>state</th><th>wrist<br>camera</th><th>front<br>camera</th><th>object<br>flow</th>
+        <th>hand<br>flow</th><th>image<br>aug</th><th>encoder<br>pos. emb.</th><th class="num">train<br>(80)</th><th class="num">test<br>(20)</th><th class="num">failed<br>(46)</th></tr></thead>
+        <tbody>
+        <tr><th scope="row">baseline</th><td>✓</td><td>–</td><td>–</td><td>–</td><td>–</td><td>–</td><td>state</td><td class="num">0.7 ± 0.4</td><td class="num">0.2 ± 0.4</td><td class="num">0.3 ± 0.3</td></tr>
+        <tr><th scope="row">baseline</th><td>✓</td><td>✓</td><td>–</td><td>–</td><td>–</td><td>✓</td><td>all</td><td class="num">59.1 ± 1.2</td><td class="num">36.6 ± 2.9</td><td class="num">24.9 ± 1.7</td></tr>
+        <tr><th scope="row">baseline</th><td>✓</td><td>–</td><td>✓</td><td>–</td><td>–</td><td>✓</td><td>all</td><td class="num">78.0 ± 0.7</td><td class="num">56.0 ± 3.9</td><td class="num">23.5 ± 1.2</td></tr>
+        <tr><th scope="row">baseline</th><td>✓</td><td>✓</td><td>✓</td><td>–</td><td>–</td><td>–</td><td>none</td><td class="num">83.0 ± 1.2</td><td class="num">62.6 ± 2.7</td><td class="num">41.8 ± 0.8</td></tr>
+        <tr><th scope="row">baseline</th><td>✓</td><td>✓</td><td>✓</td><td>–</td><td>–</td><td>✓</td><td>none</td><td class="num">84.4 ± 1.6</td><td class="num"><strong>77.8 ± 1.7</strong></td><td class="num"><strong>42.1 ± 1.6</strong></td></tr>
+        <tr><th scope="row">baseline</th><td>✓</td><td>✓</td><td>✓</td><td>–</td><td>–</td><td>✓</td><td>all</td><td class="num">82.3 ± 1.6</td><td class="num">64.4 ± 3.7</td><td class="num">41.7 ± 2.1</td></tr>
+        <tr><th scope="row">flow-conditioned</th><td>✓</td><td>–</td><td>–</td><td>–</td><td>✓</td><td>–</td><td>state, flow</td><td class="num">88.3 ± 1.7</td><td class="num">66.0 ± 1.4</td><td class="num">4.2 ± 1.3</td></tr>
+        <tr><th scope="row">flow-conditioned</th><td>✓</td><td>✓</td><td>–</td><td>–</td><td>✓</td><td>✓</td><td>all</td><td class="num">91.3 ± 1.2</td><td class="num">72.0 ± 0.0</td><td class="num">7.8 ± 1.2</td></tr>
+        <tr><th scope="row">flow-conditioned</th><td>✓</td><td>–</td><td>✓</td><td>–</td><td>✓</td><td>✓</td><td>all</td><td class="num">91.7 ± 0.5</td><td class="num">69.0 ± 1.7</td><td class="num">8.1 ± 0.7</td></tr>
+        <tr><th scope="row">flow-conditioned</th><td>✓</td><td>✓</td><td>✓</td><td>–</td><td>✓</td><td>✓</td><td>all</td><td class="num">89.8 ± 0.6</td><td class="num">73.4 ± 3.6</td><td class="num">7.0 ± 1.0</td></tr>
+        <tr><th scope="row">flow-conditioned</th><td>✓</td><td>–</td><td>–</td><td>✓</td><td>✓</td><td>–</td><td>state, flow</td><td class="num">88.3 ± 1.0</td><td class="num">62.2 ± 1.9</td><td class="num">3.8 ± 0.4</td></tr>
+        <tr><th scope="row">flow-conditioned</th><td>✓</td><td>✓</td><td>–</td><td>✓</td><td>✓</td><td>✓</td><td>all</td><td class="num">92.3 ± 1.0</td><td class="num">76.6 ± 1.4</td><td class="num">7.0 ± 1.4</td></tr>
+        <tr><th scope="row">flow-conditioned</th><td>✓</td><td>–</td><td>✓</td><td>✓</td><td>✓</td><td>✓</td><td>all</td><td class="num"><strong>93.2 ± 0.8</strong></td><td class="num">71.2 ± 3.3</td><td class="num">3.7 ± 1.1</td></tr>
+        <tr><th scope="row">flow-conditioned</th><td>✓</td><td>✓</td><td>✓</td><td>✓</td><td>✓</td><td>✓</td><td>all</td><td class="num">89.3 ± 0.8</td><td class="num">72.4 ± 2.2</td><td class="num">2.6 ± 1.0</td></tr>
+        </tbody>
+      </table>
+      </div>
+    <h3 class="sub">Ablations</h3>
+      <div class="scroll">
+      <table class="stats results">
+        <thead><tr><th>type</th><th>robot<br>state</th><th>wrist<br>camera</th><th>front<br>camera</th><th>object<br>flow</th>
+        <th>hand<br>flow</th><th>image<br>aug</th><th>encoder<br>pos. emb.</th><th class="num">train<br>(80)</th><th class="num">test<br>(20)</th><th class="num">failed<br>(46)</th></tr></thead>
+        <tbody>
+        <tr><th scope="row">flow-conditioned (reference)</th><td>✓</td><td>✓</td><td>–</td><td>✓</td><td>✓</td><td>✓</td><td>all</td><td class="num">92.3 ± 1.0</td><td class="num"><strong>76.6 ± 1.4</strong></td><td class="num">7.0 ± 1.4</td></tr>
+        <tr><th scope="row">flow-conditioned (no image pos. emb.)</th><td>✓</td><td>✓</td><td>–</td><td>✓</td><td>✓</td><td>✓</td><td>state, flow</td><td class="num"><strong>93.5 ± 0.4</strong></td><td class="num">73.0 ± 1.8</td><td class="num">6.8 ± 0.4</td></tr>
+        <tr><th scope="row">flow-conditioned (flow dropout 0.2)</th><td>✓</td><td>✓</td><td>–</td><td>✓</td><td>✓</td><td>✓</td><td>all</td><td class="num">87.5 ± 0.4</td><td class="num">70.4 ± 3.1</td><td class="num">7.1 ± 0.6</td></tr>
+        <tr><th scope="row">flow-conditioned (world-frame flow)</th><td>✓</td><td>✓</td><td>–</td><td>✓</td><td>✓</td><td>✓</td><td>all</td><td class="num">82.0 ± 2.1</td><td class="num">57.0 ± 0.9</td><td class="num"><strong>12.5 ± 0.5</strong></td></tr>
+        </tbody>
+      </table>
+      </div>
+    <ul class="points">
+      <li><strong>No image pos. emb.:</strong> the learned position embedding is added to the state and flow tokens only, not the image patches.</li>
+      <li><strong>Flow dropout 0.2:</strong> during training, the whole flow is replaced by a learned mask token in 20 % of samples.</li>
+      <li><strong>World-frame flow:</strong> flow points are given in the sim world frame instead of relative to the gripper.</li>
+    </ul>
   </section>
 
   <section id="visualizations">
