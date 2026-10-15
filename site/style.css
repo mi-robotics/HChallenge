@@ -1,16 +1,16 @@
 /* Shared style for the project site. Same tokens and fonts as the step reports (docs/steps). */
 :root {
-  --node: #ffffff; --node-alt: #eef1fb; --train: #2d4fd0; --test: #d98a00; --failed: #8a919d; --notusable: #c3c8d0; --pick: #dcefd9;
+  --node: #ffffff; --node-alt: #eef1fb; --train: #2d4fd0; --test: #d98a00; --failed: #8a919d; --notusable: #c3c8d0; --pick: #dcefd9; --ov-both: #2f9e5b; --ov-base: #2d4fd0; --ov-wam: #d98a00; --ov-neither: #c3c8d0;
   --img: #dae8fc; --img-l: #6c8ebf; --flw: #fff2cc; --flw-l: #d6b656; --prp: #e1d5e7; --prp-l: #9673a6; --act: #f8cecc; --act-l: #b85450; --net: #d5e8d4; --net-l: #82b366; --big: #6c8ebf;
   --bg: #f5f6f8; --surface: #ffffff; --fg: #1a1e26; --muted: #5d6573; --line: #dde1e8; --accent: #2d4fd0;
   --display: "Archivo", "Helvetica Neue", Arial, sans-serif;
   --mono: "JetBrains Mono", ui-monospace, Menlo, monospace;
 }
 @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
-  --bg: #12151b; --surface: #1a1e26; --fg: #e6e9ef; --muted: #98a0ae; --line: #2c323d; --accent: #8aa2ff; --node: #1a1e26; --node-alt: #1e2540; --train: #8aa2ff; --test: #f2b33d; --failed: #8a919d; --notusable: #4a515d; --pick: #1f3320; color-scheme: dark } }
+  --bg: #12151b; --surface: #1a1e26; --fg: #e6e9ef; --muted: #98a0ae; --line: #2c323d; --accent: #8aa2ff; --node: #1a1e26; --node-alt: #1e2540; --train: #8aa2ff; --test: #f2b33d; --failed: #8a919d; --notusable: #4a515d; --pick: #1f3320; --ov-both: #2f9a5c; --ov-base: #6f8cf5; --ov-wam: #bf8219; --ov-neither: #4a515d; color-scheme: dark } }
   --img: #1f2b40; --img-l: #6c8ebf; --flw: #3a3320; --flw-l: #d6b656; --prp: #33283a; --prp-l: #a988ba; --act: #3d2323; --act-l: #c96a66; --net: #1f3320; --net-l: #82b366; --big: #8aa2ff;
 :root[data-theme="dark"] {
-  --bg: #12151b; --surface: #1a1e26; --fg: #e6e9ef; --muted: #98a0ae; --line: #2c323d; --accent: #8aa2ff; --node: #1a1e26; --node-alt: #1e2540; --train: #8aa2ff; --test: #f2b33d; --failed: #8a919d; --notusable: #4a515d; --pick: #1f3320; color-scheme: dark }
+  --bg: #12151b; --surface: #1a1e26; --fg: #e6e9ef; --muted: #98a0ae; --line: #2c323d; --accent: #8aa2ff; --node: #1a1e26; --node-alt: #1e2540; --train: #8aa2ff; --test: #f2b33d; --failed: #8a919d; --notusable: #4a515d; --pick: #1f3320; --ov-both: #2f9a5c; --ov-base: #6f8cf5; --ov-wam: #bf8219; --ov-neither: #4a515d; color-scheme: dark }
   --img: #1f2b40; --img-l: #6c8ebf; --flw: #3a3320; --flw-l: #d6b656; --prp: #33283a; --prp-l: #a988ba; --act: #3d2323; --act-l: #c96a66; --net: #1f3320; --net-l: #82b366; --big: #8aa2ff;
 
 * { box-sizing: border-box; }
@@ -119,3 +119,22 @@ figcaption { font: 13px/1.5 var(--mono); color: var(--muted); }
 .picker .eps button { font: 500 13px var(--mono); min-width: 2.4rem; padding: 6px 10px; border-radius: 6px; border: 1px solid var(--line); background: var(--surface); color: var(--fg); cursor: pointer; }
 .picker .eps button[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: var(--bg); }
 .picker .eps button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.arch .c-flow-d { fill: var(--flw-l); fill-opacity: .45; stroke: var(--flw-l); }
+.arch .sep { stroke: var(--line); stroke-width: 1; }
+.wamd svg { max-width: 62rem; }
+.arch .grp { fill: none; stroke: var(--muted); stroke-width: 1.2; stroke-dasharray: 5 4; }
+.arch .cell { stroke: var(--flw-l); stroke-width: .5; }
+.arch .cell2 { stroke: var(--flw-l); stroke-width: 1; }
+.arch .half { stroke: var(--fg); stroke-width: 1.4; }
+.arch .patch { fill: var(--act); stroke: var(--act-l); stroke-width: 1.5; }
+.tiled svg { min-width: 760px; max-width: 54rem; }
+.evald svg { max-width: 62rem; }
+.arch .h { font: 700 18px var(--display); fill: var(--fg); }
+.results tr.split th, .results tr.split td { border-bottom: 2px solid var(--fg); }
+.overlap { max-width: 64rem; }
+.overlap svg { min-width: 760px; }
+.pt.ov-both { fill: var(--ov-both); } .pt.ov-base { fill: var(--ov-base); } .pt.ov-wam { fill: var(--ov-wam); } .pt.ov-neither { fill: var(--ov-neither); }
+.sw { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 8px; vertical-align: -1px; }
+.sw.ov-both { background: var(--ov-both); } .sw.ov-base { background: var(--ov-base); } .sw.ov-wam { background: var(--ov-wam); } .sw.ov-neither { background: var(--ov-neither); }
+.eps-rows { display: grid; gap: 8px; }
+.eps-label { font: 500 12px var(--mono); color: var(--muted); text-transform: uppercase; letter-spacing: .06em; min-width: 5.5rem; align-self: center; }
