@@ -29,13 +29,27 @@ Not in git: `data/` episodes (18.5 GB, see `data/README.md`), `outputs/` (checkp
 
 Linux, conda, ffmpeg and an NVIDIA GPU (we used one RTX 5090). Times are for that GPU.
 
+With our data and weights:
+
 ```
-bash scripts/setup.sh             # conda env humanoidschallenge, third-party code and checkpoints
-bash scripts/download_data.sh     # raw recordings from Hugging Face (14 GB) into data/
-bash scripts/preprocess_data.sh   # real2sim replay, robot data and action flow for every episode
-bash scripts/train_policy.sh      # flow-conditioned policy (wrist camera), then its sim evaluation (~1 h)
-bash scripts/train_wam.sh         # world action model v1 (~18 h; Cosmos weights are gated, see setup.sh)
-bash scripts/eval_wam.sh          # end-to-end: WAM plans -> policy in sim, with pauses (~3 h)
+bash scripts/setup.sh              # conda env humanoidschallenge, third-party code and checkpoints
+bash scripts/download_data.sh      # dataset from Hugging Face into data/ (raw + processed, 19 GB)
+bash scripts/download_weights.sh   # our policy and WAM weights into outputs/ (750 MB)
+bash scripts/run_samples.sh        # WAM plans -> policy in sim on the test episodes, rendered videos (~20 min)
 ```
 
-Raw data: https://huggingface.co/datasets/mcarroll101/HChallenge-mug-pnp
+Everything from scratch:
+
+```
+bash scripts/download_data.sh --raw   # raw recordings only (14 GB)
+bash scripts/preprocess_data.sh       # real2sim replay, robot data and action flow for every episode
+bash scripts/train_policy.sh          # flow-conditioned policy (wrist camera), then its sim evaluation (~1 h)
+bash scripts/train_wam.sh             # world action model v1 (~18 h)
+bash scripts/eval_wam.sh              # end-to-end: WAM plans -> policy in sim, with pauses (~3 h)
+```
+
+The WAM's base model, nvidia/Cosmos-Predict2-2B-Video2World, is gated: accept its licence on Hugging Face and run
+`hf auth login` first.
+
+Data: https://huggingface.co/datasets/mcarroll101/HChallenge-mug-pnp ·
+weights: https://huggingface.co/mcarroll101/HChallenge-models
