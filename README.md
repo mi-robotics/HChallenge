@@ -17,7 +17,6 @@ flow-conditioned policy carries it out in sim.
 ├── policy/         flow-conditioned action policy (flow matching, DINOv2): train and closed-loop eval in sim
 ├── wam/            world action model: Cosmos-Predict2 fine-tuned (LoRA) to predict video + flow; planning and end-to-end eval
 ├── site/           the project website (GitHub Pages, deployed by .github/workflows/pages.yml)
-├── media/          videos and images from each development step
 ├── PROJECT_PLAN.md phases, steps, key decisions and measured results
 ├── CLAUDE.md       working notes: environment, conventions
 └── requirements.txt

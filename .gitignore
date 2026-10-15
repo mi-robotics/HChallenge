@@ -15,12 +15,12 @@ data/*
 third_party/
 
 # Small result videos for reports/README are kept
-!media/**/*.mp4
 !site/vid/*.mp4
 !site/vid/**/*.mp4
 
 # Training runs (checkpoints, logs)
 outputs/
 
-# Step reports and tracker: kept locally, not in the repo
+# Step reports, tracker and their media: kept locally, not in the repo
 docs/
+media/
