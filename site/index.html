@@ -34,7 +34,7 @@
     </ul>
     <h3 class="sub">Concept</h3>
     <ul class="points">
-      <li>Can we drive a robot to solve a task in simulation, given just an image of the scene in the real world?</li>
+      <li>Can we drive a robot to solve a task in simulation, given just an image of the scene in the real world and the text instruction?</li>
       <li>Use a world model to plan how to solve the task by rolling out videos and generating the flow of key points.
       Then use the generated flow of key points to condition and drive a policy in simulation.</li>
     </ul>
@@ -63,8 +63,9 @@
           <div class="va up" style="grid-area:2/3" aria-hidden="true"></div>
           <div class="va down" style="grid-area:2/5" aria-hidden="true"></div>
 
-          <div class="mmedia mend" style="grid-area:3/1"><div class="mtitle">First frame</div>
-            <img id="mfirst" src="vid/method/20261009_113014/first.jpg" alt="First frame of a real recording: the mug and plate on the desk" style="aspect-ratio:448 / 256"></div>
+          <div class="mmedia mend" style="grid-area:3/1"><div class="mtitle">First frame + instruction</div>
+            <img id="mfirst" src="vid/method/20261009_113014/first.jpg" alt="First frame of a real recording: the mug and plate on the desk" style="aspect-ratio:448 / 256">
+            <div class="mprompt"><span>text instruction</span>“pick up the mug and put it on the plate”</div></div>
           <div class="ha" style="grid-area:3/2" aria-hidden="true"></div>
           <div class="mbox m-net" style="grid-area:3/3"><strong>World action model</strong><span>Cosmos rolls out video + key-point flow</span></div>
           <div class="ha" style="grid-area:3/4" aria-hidden="true"></div>
@@ -122,6 +123,17 @@
         </tbody>
       </table>
     </div>
+  </section>
+
+  <section id="limitations">
+    <h2>Limitations</h2>
+    <ul class="points">
+      <li>The major limitation of this work is that it is only demonstrated on a single, simple task.</li>
+      <li>The flow-conditioned policy does not seem to take full advantage of the wrist camera. With ground truth flow
+      the camera helps (73.0 % vs 62.2 % on test), but with the WAM's plans the policy without camera observations does
+      as well (28.8 % vs 27.8 %, within the run-to-run spread). This suggests the flow + camera policy over-attends to the
+      flow and does not use the camera to correct an imperfect plan.</li>
+    </ul>
   </section>
 </main>
 

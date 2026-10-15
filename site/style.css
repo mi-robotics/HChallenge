@@ -163,3 +163,5 @@ figcaption { font: 13px/1.5 var(--mono); color: var(--muted); }
 .mpick { margin-top: 6px; }
 .results.full { width: 100%; }
 .results th.grp-tag { font: 700 13px/1.3 var(--display); color: var(--fg); white-space: normal; width: 9rem; vertical-align: middle; border-bottom: 2px solid var(--fg); padding-right: 16px; }
+.mprompt { box-sizing: border-box; border: 1px solid var(--line); border-radius: 6px; background: var(--surface); padding: 6px 8px; font: 12px/1.35 var(--mono); color: var(--fg); text-align: center; }
+.mprompt span { display: block; font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .06em; }
