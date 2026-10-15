@@ -8,4 +8,4 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 conda run --no-capture-output -n humanoidschallenge \
-  hf download mcarroll101/HChallenge-models --local-dir outputs --exclude README.md
+  hf download mcarroll101/HChallenge-models --local-dir outputs --exclude README.md --exclude .gitattributes

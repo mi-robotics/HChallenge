@@ -35,7 +35,7 @@ With our data and weights:
 bash scripts/setup.sh              # conda env humanoidschallenge, third-party code and checkpoints
 bash scripts/download_data.sh      # dataset from Hugging Face into data/ (raw + processed, 19 GB)
 bash scripts/download_weights.sh   # our policy and WAM weights into outputs/ (750 MB)
-bash scripts/run_samples.sh        # WAM plans -> policy in sim on the test episodes, rendered videos (~20 min)
+bash scripts/run_samples.sh        # WAM plans -> policy in sim on the test episodes, rendered videos (~10 min)
 ```
 
 Everything from scratch:

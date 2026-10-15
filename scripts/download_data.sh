@@ -7,7 +7,7 @@
 #   bash scripts/download_data.sh --raw      raw only, then run scripts/preprocess_data.sh
 set -euo pipefail
 cd "$(dirname "$0")/.."
-ARGS=(--exclude README.md)
+ARGS=(--exclude README.md --exclude .gitattributes)
 if [ "${1:-}" = "--raw" ]; then
   ARGS=(--include "*/color.mp4" --include "*/depth.mkv" --include "*/frames.csv" --include "*/meta.json")
 fi
