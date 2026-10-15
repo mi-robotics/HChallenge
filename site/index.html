@@ -23,23 +23,105 @@
 </header>
 
 <main>
-  <header>
-    <h1>Driving a sim robot from videos of my own hand</h1>
-  </header>
-
   <section id="summary">
     <h2>Summary</h2>
-    <p class="todo">Content to come.</p>
+    <h3 class="sub">Motivation</h3>
+    <ul class="points">
+      <li>Robot demonstrations are slow and expensive to collect. Videos of a human hand doing the task are cheap: a
+      camera and a few seconds per demonstration.</li>
+      <li>A hand is not a robot, so the video cannot be replayed as robot actions directly. Something in between has
+      to carry the intent of the motion from one body to the other.</li>
+    </ul>
+    <h3 class="sub">Concept</h3>
+    <ul class="points">
+      <li>Can we drive a robot to solve a task in simulation, given just an image of the scene in the real world?</li>
+      <li>Use a world model to plan how to solve the task by rolling out videos and generating the flow of key points.
+      Then use the generated flow of key points to condition and drive a policy in simulation.</li>
+    </ul>
+    <h3 class="sub">Personal Motivation</h3>
+    <ul class="points">
+      <li>Most of my PhD research has focused on reinforcement learning for locomotion, and more recently on typical VLA
+      architectures for industrial tasks.</li>
+      <li>I have had little opportunity to explore video world models or real2sim research.</li>
+      <li>The same day I read about the internship challenge, my collaborator on my most recent work showed me the paper
+      <em>Hydra-0: Action Flow for Generalist World Modeling and Control</em>.</li>
+      <li>This challenge was a great opportunity to explore these technologies I had not worked with before, while
+      using my experience with VLAs along the way.</li>
+      <li>I have really enjoyed this past week of work.</li>
+    </ul>
   </section>
 
-  <section id="pipeline">
-    <h2>Pipeline</h2>
-    <p class="todo">Content to come.</p>
+  <section id="method">
+    <h2>Method</h2>
+    <figure class="method picker">
+      <div class="scroll">
+        <div class="mflow">
+          <div class="mmedia" style="grid-area:1/3"><div class="mcap">generated video + planned action flow</div>
+            <video class="msync" data-v="wam" src="vid/method/20261009_113014/wam.mp4" muted playsinline style="aspect-ratio:448 / 256"></video></div>
+          <div class="mmedia" style="grid-area:1/5"><div class="mcap">wrist camera obs</div>
+            <video class="msync" data-v="wrist" src="vid/method/20261009_113014/wrist.mp4" muted playsinline style="aspect-ratio:1"></video></div>
+          <div class="va up" style="grid-area:2/3" aria-hidden="true"></div>
+          <div class="va down" style="grid-area:2/5" aria-hidden="true"></div>
+
+          <div class="mmedia mend" style="grid-area:3/1"><div class="mtitle">First frame</div>
+            <img id="mfirst" src="vid/method/20261009_113014/first.jpg" alt="First frame of a real recording: the mug and plate on the desk" style="aspect-ratio:448 / 256"></div>
+          <div class="ha" style="grid-area:3/2" aria-hidden="true"></div>
+          <div class="mbox m-net" style="grid-area:3/3"><strong>World action model</strong><span>Cosmos rolls out video + key-point flow</span></div>
+          <div class="ha" style="grid-area:3/4" aria-hidden="true"></div>
+          <div class="mbox m-net" style="grid-area:3/5"><strong>Policy</strong><span>flow-conditioned, 32 actions</span></div>
+          <div class="ha2" style="grid-area:3/6" aria-hidden="true"><div class="ha"></div><div class="ha back"></div></div>
+          <div class="mmedia mend" style="grid-area:3/7"><div class="mtitle">Simulation</div>
+            <video class="msync" data-v="third" src="vid/method/20261009_113014/third.mp4" muted playsinline style="aspect-ratio:1"></video></div>
+        </div>
+      </div>
+      <div class="eps mpick" role="group" aria-label="Choose episode"><span class="eps-label">choose episode</span>
+        <button type="button" data-ep="20261009_113014" aria-pressed="true">1</button>
+        <button type="button" data-ep="20261009_125024" aria-pressed="false">2</button>
+        <button type="button" data-ep="20261009_123259" aria-pressed="false">3</button>
+        <button type="button" data-ep="20261009_125010" aria-pressed="false">4</button>
+        <button type="button" data-ep="20261009_111418" aria-pressed="false">5</button>
+        <button type="button" data-ep="20261009_112142" aria-pressed="false">6</button>
+        <button type="button" data-ep="20261009_111844" aria-pressed="false">7</button>
+        <button type="button" data-ep="20261009_112417" aria-pressed="false">8</button>
+        <button type="button" data-ep="20261009_111329" aria-pressed="false">9</button>
+        <button type="button" data-ep="20261009_125332" aria-pressed="false">10</button>
+      </div>
+    </figure>
+    <script>
+      (() => {
+        const vs = [...document.querySelectorAll('.msync')];
+        let ready = 0;
+        const restart = () => vs.forEach(v => { v.currentTime = 0; v.play().catch(() => {}); });
+        const arm = () => { ready = 0; vs.forEach(v => v.addEventListener('canplaythrough', () => { if (++ready === vs.length) restart(); }, { once: true })); };
+        arm();
+        vs[0].addEventListener('ended', restart);
+        document.querySelectorAll('.mpick button').forEach(b => b.addEventListener('click', () => {
+          document.querySelectorAll('.mpick button').forEach(x => x.setAttribute('aria-pressed', x === b));
+          const e = b.dataset.ep;
+          document.getElementById('mfirst').src = 'vid/method/' + e + '/first.jpg';
+          arm();
+          vs.forEach(v => { v.src = 'vid/method/' + e + '/' + v.dataset.v + '.mp4'; v.load(); });
+        }));
+      })();
+    </script>
   </section>
 
   <section id="results">
     <h2>Results</h2>
-    <p class="todo">Content to come.</p>
+    <div class="scroll">
+      <table class="stats results full">
+        <thead><tr><th>flow</th><th class="num">train<br>(80)</th><th class="num">test<br>(20)</th><th class="num">failed<br>(46)</th></tr></thead>
+        <tbody>
+          <tr><th scope="row">no flow: baseline, both cameras</th><td class="num">84.4 ± 1.6</td><td class="num">77.8 ± 1.7</td><td class="num">42.1 ± 1.6</td></tr>
+          <tr><th scope="row">no flow: baseline, wrist camera</th><td class="num">59.1 ± 1.2</td><td class="num">36.6 ± 2.9</td><td class="num">24.9 ± 1.7</td></tr>
+          <tr><th scope="row">no flow: baseline, no cam obs (state only)</th><td class="num">0.7 ± 0.4</td><td class="num">0.2 ± 0.4</td><td class="num">0.3 ± 0.3</td></tr>
+          <tr><th scope="row">flow-conditioned, ground truth flow (E2E Policy, wrist cam obs)</th><td class="num">93.5 ± 0.4</td><td class="num">73.0 ± 1.8</td><td class="num">6.8 ± 0.4</td></tr>
+          <tr class="split"><th scope="row">flow-conditioned, ground truth flow (E2E Policy, No cam obs)</th><td class="num">88.3 ± 1.0</td><td class="num">62.2 ± 1.9</td><td class="num">3.8 ± 0.4</td></tr>
+          <tr><th scope="row">ours</th><td class="num">58.2 ± 2.9</td><td class="num">27.8 ± 8.0</td><td class="num">4.8 ± 0.9</td></tr>
+          <tr class="pick"><th scope="row">ours (no cam obs)</th><td class="num">59.2 ± 1.9</td><td class="num">28.8 ± 5.7</td><td class="num">2.6 ± 2.1</td></tr>
+        </tbody>
+      </table>
+    </div>
   </section>
 </main>
 

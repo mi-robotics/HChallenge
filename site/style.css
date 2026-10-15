@@ -138,3 +138,27 @@ figcaption { font: 13px/1.5 var(--mono); color: var(--muted); }
 .sw.ov-both { background: var(--ov-both); } .sw.ov-base { background: var(--ov-base); } .sw.ov-wam { background: var(--ov-wam); } .sw.ov-neither { background: var(--ov-neither); }
 .eps-rows { display: grid; gap: 8px; }
 .eps-label { font: 500 12px var(--mono); color: var(--muted); text-transform: uppercase; letter-spacing: .06em; min-width: 5.5rem; align-self: center; }
+.method { margin: 0; display: grid; gap: 8px; max-width: 66rem; }
+.mflow { display: grid; grid-template-columns: 1.6fr 44px 1.6fr 44px 1fr 44px 1fr; grid-template-rows: auto 36px auto; align-items: center; row-gap: 0; min-width: 820px; }
+.mmedia { display: grid; gap: 4px; align-self: end; }
+.mmedia.mend { align-self: center; }
+.mmedia img, .mmedia video { box-sizing: border-box; display: block; width: 100%; max-width: 100%; border-radius: 6px; border: 1px solid var(--line); background: var(--surface); }
+.mtitle { font: 700 14px var(--display); color: var(--fg); text-align: center; }
+.mcap { font: 12px/1.3 var(--mono); color: var(--muted); text-align: center; }
+.mbox { box-sizing: border-box; display: grid; gap: 2px; align-content: center; align-self: stretch; text-align: center; padding: 14px 10px; border-radius: 8px; border: 1.2px solid; }
+.mbox strong { font: 700 14px var(--display); color: var(--fg); }
+.mbox span { font: 12px/1.35 var(--mono); color: var(--fg); }
+.m-net { background: var(--net); border-color: var(--net-l); }
+.marrow { text-align: center; font: 20px var(--display); color: var(--muted); }
+.mvarrow { text-align: center; font: 22px/1 var(--display); color: var(--muted); }
+.ha { position: relative; height: 3px; background: var(--muted); margin-right: 1px; }
+.ha::after { content: ""; position: absolute; right: -1px; top: 50%; transform: translateY(-50%); border: 7px solid transparent; border-left: 11px solid var(--muted); border-right: 0; }
+.ha.back { margin: 0 0 0 1px; }
+.ha.back::after { right: auto; left: -1px; border-left: 0; border-right: 11px solid var(--muted); }
+.ha2 { display: grid; gap: 12px; }
+.va { position: relative; width: 3px; height: 100%; justify-self: center; background: var(--muted); }
+.va::after { content: ""; position: absolute; left: 50%; transform: translateX(-50%); border: 7px solid transparent; }
+.va.up::after { top: -1px; border-top: 0; border-bottom: 11px solid var(--muted); }
+.va.down::after { bottom: -1px; border-bottom: 0; border-top: 11px solid var(--muted); }
+.mpick { margin-top: 6px; }
+.results.full { width: 100%; }
